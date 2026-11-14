@@ -1,0 +1,17 @@
+# Whitelist: only project sources/tooling are tracked. Everything derived from the game
+# (disc image, extracted files, wrapped ELFs, decompilations, generated C, binaries, saves) stays local.
+/*
+!/.gitignore
+!/README.md
+!/Makefile
+!/LICENSE
+!/runtime/
+!/tools/
+!/docs/
+!/analysis/
+/analysis/*
+!/analysis/rea_*.txt
+!/analysis/extra_*.txt
+!/analysis/patch_*.c
+__pycache__/
+*.pyc
