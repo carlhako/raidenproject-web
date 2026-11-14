@@ -110,7 +110,8 @@ game over, memory-card save, music and sound effects.
 Known limitations:
 
 - Raiden II's per-stage code is loaded from disc into RAM at run time, so it runs in the built-in
-  interpreter. Speed is still about 8× real time on one core.
+  interpreter. This costs nothing you can notice: headless it runs about 9× faster than real
+  time on one core, the same as Raiden, so it holds a steady 60 fps with plenty to spare.
 - 1P vs 2P with two gamepads and the Raiden II ending have not been exercised.
 
 ## Legal
