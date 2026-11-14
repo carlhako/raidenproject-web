@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <time.h>
 #include <zlib.h>
+#include <sys/stat.h>
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
@@ -49,6 +50,7 @@ void platform_init(void) {
     if (getenv("PSX_FRAMES")) max_frames = atoi(getenv("PSX_FRAMES"));
     if (getenv("PSX_SHOT_EVERY")) shot_every = atoi(getenv("PSX_SHOT_EVERY"));
     if (getenv("PSX_INPUT")) parse_script(getenv("PSX_INPUT"));
+    if (shot_every || getenv("PSX_SHOT_FRAMES") || getenv("PSX_DUMPRAM") || getenv("PSX_DUMP_ON_FATAL")) mkdir("shots", 0755);
     if (getenv("PSX_TURBO")) turbo = 1;
     if (headless) { SDL_setenv("SDL_VIDEODRIVER", "dummy", 1); SDL_setenv("SDL_AUDIODRIVER", "dummy", 1); turbo = 1; }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) {
