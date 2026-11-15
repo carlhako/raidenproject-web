@@ -15,3 +15,11 @@
 !/analysis/patch_*.c
 __pycache__/
 *.pyc
+!/web.mk
+!/package.json
+!/package-lock.json
+!/web/
+!/server/
+!/deploy/
+/dist/
+node_modules/

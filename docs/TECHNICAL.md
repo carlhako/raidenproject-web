@@ -173,3 +173,30 @@ Not exercised yet: 1P vs 2P with two gamepads, and the end of Raiden II.
 
 The game data comes from your own disc. The generated code in `gen/` is derived from the game's
 executables, so don't redistribute it.
+
+
+## Web port and netplay
+
+- **Raiden II only:** the web `main()` loads `PSJJ3.EXE` (embedded in the wasm) and starts it directly with the BIOS
+  directory set to `\JJ3X`. Any later `Load`/`LoadExec` of another executable (interception menu: main menu, switch
+  game) is turned into a reload of `PSJJ3.EXE` (`bios_boot_raiden2`, `r2only` in `runtime/bios.c`). Natively,
+  `PSX_RAIDEN2=1 ./raiden` does the same.
+- **Build:** `make web` compiles `gen/*.c` and `runtime/*.c` (all but `platform.c`) with emcc into `dist/raiden.{js,wasm}`;
+  `web/` supplies the page. The recompiler emits `TAILCALL(f())` for inter-function jumps (`musttail` under clang) so the
+  small browser stack never grows. Native and wasm runs are deterministic (identical state hashes over 20,000 random-input frames).
+- **Threading:** the game never yields, so it runs in a Web Worker (`web/game-worker.js`); video, audio and controls move
+  through SharedArrayBuffers, so the page needs cross-origin isolation (headers set by `server/index.js`). Pacing is NTSC 60 Hz.
+- **Disc:** the 56 MB image is stored in OPFS and read synchronously by the worker.
+- **Sessions:** the server keeps an authoritative per-frame input log `(p1 | p2 << 16)` for each game. While the host plays
+  alone, it streams its pad per frame and the server appends and fans out. A **watcher** receives the log from frame 0 and
+  replays it (the recompiled game cannot snapshot its state, but it is deterministic), running unthrottled and muted while
+  more than 20 frames behind, then in real time ~6 frames behind live.
+- **Joining:** a watcher caught up to the live game presses Start. The server picks `lockFrom = head + 90`
+  and an input delay from the measured round trips. From then on host and player 2 send pad state for frame `n + delay`;
+  the server merges both for each frame and broadcasts the confirmed frame to host, P2 and watchers. If P2 leaves the
+  host continues (P2 pad idle); a new watcher can take the slot later. If the host leaves the game ends for everyone.
+  A Start pulse is injected for the first P2 frames so a P2 joining at the title screen starts a 2-player game.
+- **Desync check:** every 120 frames everybody sends a RAM/register hash; the server compares them with the host's.
+- **Limits:** about 2.4 hours per game (2^19 frames), 60 games, one memory card snapshot per game (the host's).
+- **Testing:** `node tools/node-harness.mjs <disc.bin> <frames> "300:start,3500:2start" [outdir]` runs the wasm headless
+  under Node (`2` prefix = pad 2, `HOLD=n`, `RANDOM_INPUT=1`, `SHOT_EVERY=n`).

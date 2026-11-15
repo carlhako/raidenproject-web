@@ -1,0 +1,19 @@
+[Unit]
+Description=Raiden II Web (static server + netplay relay)
+After=network.target
+
+[Service]
+User=raidenproject
+WorkingDirectory=/opt/raidenproject-web
+EnvironmentFile=-/etc/raidenproject-web.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

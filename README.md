@@ -1,3 +1,48 @@
+# Raiden II Web: browser build with spectating and drop-in co-op
+
+A fork of [raiden-project-recomp](https://github.com/carlhako/raiden-project-recomp) that runs the
+statically recompiled **Raiden II** from *The Raiden Project* (USA) inside a web browser
+(WebAssembly). It boots straight into Raiden II (no launcher menu, no Raiden I). A small Node server
+hosts the files, lists live games and relays inputs.
+
+> **No game files are included.** You need your own copy of *The Raiden Project (USA)*. The wasm, the
+> generated code and the packed disc are derived from the game: keep them private.
+
+## Build
+
+Needs gcc, make, python3, Node 20+ and [emsdk](https://github.com/emscripten-core/emsdk).
+
+```bash
+mkdir -p disc && cp "Raiden Project, The (USA).bin" "Raiden Project, The (USA).cue" disc/
+make extract && make          # extracts, recompiles all four executables, builds the native game too
+source ~/tools/emsdk/emsdk_env.sh && make web
+python3 -I tools/pack_disc.py
+npm install
+```
+
+## Run
+
+```bash
+npm start
+```
+
+Open <http://localhost:8080> (localhost counts as a secure origin). The first visit downloads the
+56 MB disc image into the browser's private storage. For other machines serve it over HTTPS: see
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
+- **Play** starts a game. Every game is public: it shows up under *Live games* for everyone.
+- **Watch** a running game. Your browser replays it fast (muted, with a progress bar) until it is live.
+- **Press Start while watching** to join the game as player 2. No codes: if a game has no player 2 you can take the slot.
+- Chat: lobby chat for everybody on the menu, game chat for the players and watchers of a game (`T`).
+- Video filter **Smooth / CRT / Sharp** at the top right (or `V`); needs WebGL2.
+
+Controls: arrows, Enter = Start, Backspace = Select, Z/X/A/S = ✕○□△, Q/W/E/R = L1/R1/L2/R2. Gamepads work too.
+How it works: the "Web port and netplay" section of [docs/TECHNICAL.md](docs/TECHNICAL.md).
+
+---
+
+# Original README (native Linux build)
+
 # The Raiden Project — native Linux port (static recompilation)
 
 Play the PlayStation game **The Raiden Project** (USA, SCUS-94402) as a native Linux program.

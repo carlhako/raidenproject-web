@@ -95,6 +95,13 @@ void sp_mismatch(uint32_t callee, uint32_t site, uint32_t before, uint32_t after
 #endif
 #define CHECK_EVENTS() do { if (cycles >= next_event) run_events(); } while (0)
 
+/* ---- tail calls: generated code relies on these not growing the stack ---- */
+#if defined(__clang__)
+#define TAILCALL(e) do { __attribute__((musttail)) return e; } while (0)
+#else
+#define TAILCALL(e) do { e; return; } while (0)
+#endif
+
 /* ---- helpers called by generated code ---- */
 void call_addr(uint32_t addr);
 void jump_addr(uint32_t addr);

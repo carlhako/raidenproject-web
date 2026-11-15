@@ -1,0 +1,56 @@
+:root { --bg: #14121c; --panel: #211d2e; --ink: #f1ecff; --mute: #9a92b5; --accent: #ff7ab8; --accent2: #7ad7ff; --line: #3a3450; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, sans-serif; overflow: hidden; }
+#stage { position: relative; width: 100vw; height: 100vh; display: grid; place-items: center; }
+#screen { width: min(100vw, calc(100vh * 4 / 3)); height: min(100vh, calc(100vw * 3 / 4)); background: #000; }
+#screen.idle { opacity: .25; }
+.panel { position: absolute; width: min(92vw, 440px); background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line);
+  border-radius: 14px; padding: 24px; box-shadow: 0 20px 60px #0009; text-align: center; }
+h1 { margin: 0; font-size: 2rem; letter-spacing: .04em; color: var(--accent); }
+.sub { color: var(--mute); margin: 4px 0 16px; }
+.status { min-height: 1.4em; color: var(--accent2); margin-bottom: 12px; }
+.status.err { color: #ff8d8d; }
+button { font: inherit; font-weight: 600; padding: 12px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #2a0f20; cursor: pointer; width: 100%; margin: 6px 0; }
+button:hover { filter: brightness(1.1); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+button.small { width: auto; padding: 4px 10px; margin: 0 0 0 6px; font-size: .8rem; }
+.join { display: flex; gap: 8px; margin: 6px 0; }
+.join button { width: 110px; margin: 0; background: var(--accent2); color: #08202b; }
+input[type=text], #lobby-input, #chat-input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0004; color: var(--ink); }
+#code { flex: 1; text-transform: uppercase; letter-spacing: .3em; text-align: center; min-width: 0; }
+.own { display: block; margin-top: 12px; font-size: .85rem; color: var(--mute); cursor: pointer; }
+.own input { display: block; margin: 6px auto 0; max-width: 100%; }
+#progress { height: 8px; background: #0005; border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+#bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .2s; }
+.bigcode { font-size: 3rem; font-weight: 800; letter-spacing: .25em; color: var(--accent2); margin: 4px 0; padding-left: .25em; }
+.help { margin-top: 14px; color: var(--mute); font-size: .85rem; text-align: left; }
+.help table { width: 100%; margin-top: 6px; border-collapse: collapse; }
+.help td { padding: 2px 6px; border-bottom: 1px solid var(--line); } .help td:first-child { color: var(--ink); }
+a { color: var(--accent2); }
+#topbar { position: absolute; top: 8px; right: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; background: #000a; padding: 4px 6px; border-radius: 10px; }
+#filters { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+#filters button { width: auto; margin: 0; border-radius: 0; padding: 4px 10px; font-size: .8rem; background: transparent; color: var(--mute); }
+#filters button[aria-pressed=true] { background: var(--accent); color: #2a0f20; }
+#topbar .small { margin: 0; }
+#banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: #000b; border: 1px solid var(--line); padding: 6px 14px; border-radius: 10px; font-size: .9rem; white-space: nowrap; z-index: 4; }
+#banner.go { border-color: var(--accent2); color: var(--accent2); }
+h2 { font-size: 1rem; margin: 18px 0 6px; text-align: left; color: var(--ink); } .mute { color: var(--mute); font-weight: 400; font-size: .8rem; }
+.name { display: block; text-align: left; font-size: .85rem; color: var(--mute); margin-bottom: 8px; } .name input { display: block; width: 100%; margin-top: 4px; }
+#games { list-style: none; margin: 0; padding: 0; max-height: 28vh; overflow: auto; text-align: left; }
+#games li { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: .9rem; }
+#games li.empty { color: var(--mute); justify-content: center; }
+#games .info { flex: 1; min-width: 0; } #games .info small { display: block; color: var(--mute); }
+#games button { width: auto; margin: 0; padding: 6px 14px; background: var(--accent2); color: #08202b; }
+#lobby-log { height: 84px; overflow-y: auto; text-align: left; font-size: .82rem; margin-top: 10px; color: var(--mute); }
+#lobby-log b { color: var(--ink); } #lobby-input { width: 100%; margin-top: 4px; }
+#toast { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: #4a1020; border: 1px solid #ff6b8b; padding: 8px 14px; border-radius: 10px; }
+#chat { position: absolute; left: 8px; bottom: 8px; width: min(340px, 70vw); font-size: .85rem; }
+#log { max-height: 140px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+#log div { padding: 1px 0; } #log b { color: var(--accent2); } #log .me { color: var(--accent2); } #log .sys { color: var(--mute); font-style: italic; }
+#chat-input { width: 100%; margin-top: 4px; opacity: .55; } #chat-input:focus { opacity: 1; }
+.panel { max-height: 94vh; overflow: auto; }
+[hidden] { display: none !important; }
+@media (max-width: 520px) { .bigcode { font-size: 2.2rem; } }
+
+#filters button:disabled { opacity: .4; cursor: not-allowed; }

@@ -1,9 +1,13 @@
 /* CPU state, dispatcher, cop0, scheduler and program start-up. */
 #include "psx.h"
 #include <stdarg.h>
-#include <pthread.h>
 #include <signal.h>
+#ifndef __EMSCRIPTEN__
+#include <pthread.h>
 #include <execinfo.h>
+#else
+extern void js_fatal(const char *msg);
+#endif
 #include <unistd.h>
 
 uint32_t R[32];
@@ -63,9 +67,14 @@ void fatal(const char *fmt, ...) {
     for (unsigned i = 0; i < 128 && i < ring_n; i++) { unsigned k = (ring_n - (ring_n < 128 ? ring_n : 128) + i) & 127; fprintf(stderr, " %08x@%x<%x", ring[k], ring_sp[k] & 0xfffff, ring_ra[k] & 0xfffff); }
     fprintf(stderr, "\n");
 #endif
+#ifdef __EMSCRIPTEN__
+    { char m[256]; va_list ap2; va_start(ap2, fmt); vsnprintf(m, sizeof m, fmt, ap2); va_end(ap2); js_fatal(m); }
+    __builtin_trap();
+#else
     void *bt[64]; int n = backtrace(bt, 64); backtrace_symbols_fd(bt, n, 2);
     fflush(stderr);
     _exit(1);
+#endif
 }
 
 /* ---------------------------------------------------------------- dispatcher */
@@ -230,6 +239,7 @@ void check_irq(void) {
 
 /* ---------------------------------------------------------------- start-up */
 static char *exe_path;
+void bios_boot_raiden2(void);
 #include <setjmp.h>
 static jmp_buf exec_jb;
 static int exec_pending;
@@ -305,6 +315,16 @@ static void *game_thread(void *arg) {
     exit(0);
 }
 
+#ifdef __EMSCRIPTEN__
+extern void bios_boot_raiden2(void);
+int main(void) {
+    exe_path = (char *)"/extracted/PSJJ3.EXE";
+    bios_boot_raiden2();
+    cd_init(NULL);
+    game_thread(NULL);
+    return 0;
+}
+#else
 int main(int argc, char **argv) {
     const char *bin = NULL;
     for (int i = 1; i < argc; i++) {
@@ -323,6 +343,7 @@ int main(int argc, char **argv) {
     if (!bin) { snprintf(pbuf, sizeof pbuf, "%s/disc/Raiden Project, The (USA).bin", data_dir); bin = pbuf; }
     snprintf(ebuf, sizeof ebuf, "%s/extracted/SCUS_944.02", data_dir);
     exe_path = ebuf;
+    if (getenv("PSX_RAIDEN2")) { snprintf(ebuf, sizeof ebuf, "%s/extracted/JJ3X/PSJJ3.EXE", data_dir); bios_boot_raiden2(); }
     signal(SIGSEGV, segv); signal(SIGBUS, segv); signal(SIGFPE, segv);
     cd_init(bin);
     pthread_attr_t at; pthread_attr_init(&at);
@@ -332,6 +353,7 @@ int main(int argc, char **argv) {
     pthread_join(th, NULL);
     return 0;
 }
+#endif
 
 #ifdef CHECK_SP
 void sp_mismatch(uint32_t callee, uint32_t site, uint32_t before, uint32_t after) {

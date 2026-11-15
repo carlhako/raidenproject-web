@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raiden II Web</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="stage">
+  <canvas id="screen" width="368" height="240"></canvas>
+
+  <nav id="topbar" aria-label="Display">
+    <div id="filters" role="group" aria-label="Video filter"></div>
+    <button id="btn-full" class="ghost small">Fullscreen</button>
+    <button id="btn-leave" class="ghost small" hidden>Leave</button>
+  </nav>
+
+  <section id="menu" class="panel">
+    <h1>Raiden II</h1>
+    <p class="sub">Browser edition · watch and join online co-op</p>
+    <div id="status" class="status"></div>
+    <div id="progress" hidden><div id="bar"></div></div>
+    <div id="lobby" hidden>
+      <label class="name">Your name <input id="name" type="text" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Player"></label>
+      <button id="btn-play">Play (start a game)</button>
+      <h2>Live games <span id="online" class="mute"></span></h2>
+      <ul id="games"><li class="empty">Nobody is playing right now.</li></ul>
+      <div id="lobby-chat">
+        <div id="lobby-log"></div>
+        <form id="lobby-form"><input id="lobby-input" maxlength="300" placeholder="Chat with everyone here" autocomplete="off"></form>
+      </div>
+      <label class="own">Use my own disc image (.bin) <input id="own-disc" type="file" accept=".bin,.img"></label>
+    </div>
+    <details class="help"><summary>Controls</summary>
+      <table>
+        <tr><td>D-pad</td><td>Arrow keys</td></tr><tr><td>Start (also joins a game you are watching)</td><td>Enter</td></tr><tr><td>Select</td><td>Backspace</td></tr>
+        <tr><td>✕ ○ □ △</td><td>Z X A S</td></tr><tr><td>L1 R1 L2 R2</td><td>Q W E R</td></tr>
+        <tr><td>Gamepad</td><td>Standard mapping</td></tr><tr><td>Chat</td><td>T</td></tr>
+        <tr><td>Cycle video filter</td><td>V</td></tr>
+      </table>
+    </details>
+  </section>
+
+  <div id="banner" hidden></div>
+  <div id="toast" hidden></div>
+
+  <aside id="chat" hidden>
+    <div id="log"></div>
+    <form id="chat-form"><input id="chat-input" maxlength="300" placeholder="Chat (T)" autocomplete="off"></form>
+  </aside>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

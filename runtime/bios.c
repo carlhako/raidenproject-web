@@ -250,6 +250,9 @@ void bios_init(void) {
 int cd_resolve(const char *cwd, const char *path, int32_t *lba, uint32_t *size, int *is_dir);
 int cd_read_user(int32_t lba, uint32_t offset_sectors, uint8_t *dst);
 static char cd_cwd[128] = "\\";
+/* Web build is Raiden II only: start in \JJ3X and turn every Load of another executable into PSJJ3.EXE */
+static int r2only;
+void bios_boot_raiden2(void) { r2only = 1; snprintf(cd_cwd, sizeof cd_cwd, "\\JJ3X"); }
 
 /* Load(path, struct EXEC*): read a PS-X EXE into RAM and fill the EXEC block */
 static uint32_t bios_load_exe(uint32_t path_a, uint32_t ex) {
@@ -261,6 +264,7 @@ static uint32_t bios_load_exe(uint32_t path_a, uint32_t ex) {
         const char *eq = strchr(rm, '=');
         if (eq && strstr(path, "PSJJ") && !strncmp(strrchr(path, ':') ? strrchr(path, ':') + 1 : path, rm, (size_t)(eq - rm))) snprintf(path, sizeof path, "%s", eq + 1);
     }
+    if (r2only && !strstr(path, "PSJJ3")) { snprintf(path, sizeof path, "PSJJ3.EXE;1"); snprintf(cd_cwd, sizeof cd_cwd, "\\JJ3X"); }
     if (!cd_resolve(cd_cwd, path, &lba, &size, &isdir) || isdir) { LOG(1, "Load(\"%s\") not found\n", path); return 0; }
     uint8_t hdr[2048];
     cd_read_user(lba, 0, hdr);

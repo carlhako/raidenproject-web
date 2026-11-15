@@ -1,0 +1,10 @@
+{
+  "name": "raidenproject-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser build of the Raiden II static recompilation with spectating and drop-in online co-op",
+  "type": "module",
+  "scripts": { "start": "node server/index.js", "build": "make web && python3 -I tools/pack_disc.py" },
+  "dependencies": { "ws": "^8.18.0" },
+  "engines": { "node": ">=20" }
+}

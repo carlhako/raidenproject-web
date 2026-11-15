@@ -420,7 +420,7 @@ def gen_func(f):
             need.add(t)
             return (f'CHECK_EVENTS(); ' if back else '') + f'goto L_{t:08x};'
         if t in entries:
-            return f'{fname(t)}(); return;'
+            return f'TAILCALL({fname(t)}());'
         return f'op_badjump(0x{t:08x}); return;'
     idx = {a: k for k, a in enumerate(order)}
     blk = 0
@@ -440,7 +440,7 @@ def gen_func(f):
             if ft not in f.addrs or (ft in delay and ft not in f.labels):
                 # fallthrough leaves the function body (into another entry or nowhere)
                 if ft in entries and ft != e:
-                    lines.append(f'{fname(ft)}(); return;')
+                    lines.append(f'TAILCALL({fname(ft)}());')
                 elif ft == e:
                     lines.append(xfer(ft, True))
                 else:
@@ -507,7 +507,7 @@ def gen_func(f):
                 lines.append('switch (t) {')
                 for t in sorted(set(f.jt[a])):
                     if t in entries and t != e:
-                        lines.append(f'case 0x{t:08x}: {fname(t)}(); return;')
+                        lines.append(f'case 0x{t:08x}: TAILCALL({fname(t)}());')
                     else:
                         need.add(t)
                         lines.append(f'case 0x{t:08x}: goto L_{t:08x};')

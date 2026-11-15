@@ -30,6 +30,14 @@ static Pend q[8]; static int qn;
 static inline uint8_t bcd(int v) { return (uint8_t)(((v / 10) << 4) | (v % 10)); }
 static inline int unbcd(uint8_t v) { return (v >> 4) * 10 + (v & 15); }
 
+#ifdef __EMSCRIPTEN__
+extern int js_disc_sectors(void);
+extern int js_disc_read(int lba, uint8_t *dst);
+void cd_init(const char *path) { (void)path; disc_sectors = js_disc_sectors(); LOG(1, "disc: %d sectors\n", disc_sectors); }
+static void read_raw(int32_t lba, uint8_t *dst) {
+    if (lba < 0 || lba >= disc_sectors || !js_disc_read(lba, dst)) memset(dst, 0, 2352);
+}
+#else
 void cd_init(const char *path) {
     bin = fopen(path, "rb");
     if (!bin) { fprintf(stderr, "cannot open disc image %s\n", path); exit(1); }
@@ -43,6 +51,7 @@ static void read_raw(int32_t lba, uint8_t *dst) {
     fseek(bin, (long)lba * 2352, SEEK_SET);
     if (fread(dst, 1, 2352, bin) != 2352) memset(dst, 0, 2352);
 }
+#endif
 
 static void push(uint8_t type, const uint8_t *r, int len, int delay) {
     if (qn >= 8) return;
