@@ -94,14 +94,20 @@ function updatePad() {
   for (const [bit, until] of latched) { if (until > nowMs) lat |= bit; else latched.delete(bit); }
   const m0 = kb | lat | padFromGamepad(pads[0]);
   Atomics.store(game.ctrl, CTRL.PAD0, (~m0) & 0xffff);
+  if (!keysEl.hidden) for (const k of keyCaps) k.el.classList.toggle('on', !!(m0 & k.bit));
   const st = !!(m0 & (1 << 3));
   if (st && !prevStart) onStartPressed();
   prevStart = st;
 }
+const keysEl = document.getElementById('keys');
+const keyCaps = [...keysEl.querySelectorAll('.k')].map((e) => ({ el: e, bit: +e.dataset.bit }));
+let keysWanted = true; try { keysWanted = localStorage.getItem('keys') !== '0'; } catch {}
+const syncKeys = () => { keysEl.hidden = !(game && keysWanted); };
 const typing = (e) => e.target instanceof HTMLInputElement;
 addEventListener('keydown', (e) => {
   if (typing(e) || !game) return;
   if (e.code === 'KeyT') { e.preventDefault(); if (!e.repeat) el.chatInput.focus(); return; }
+  if (e.code === 'KeyK' && !e.repeat) { keysWanted = !keysWanted; try { localStorage.setItem('keys', keysWanted ? '1' : '0'); } catch {} syncKeys(); return; }
   if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); cycleFilter(); return; }
   if (e.code in KEYS) { e.preventDefault(); kb |= KEYS[e.code]; latched.set(KEYS[e.code], performance.now() + 40); updatePad(); }
 });
@@ -153,7 +159,7 @@ async function startGame(role, opts = {}) {
   worker.onmessage = (e) => onWorker(e.data);
   worker.onerror = (e) => { toast('Worker error: ' + e.message); };
   worker.postMessage({ type: 'start', ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab, memcard: b64ToCard(opts.memcard) });
-  el.menu.hidden = true; el.chat.hidden = false; el.leave.hidden = false; el.screen.classList.remove('idle');
+  el.menu.hidden = true; el.chat.hidden = false; el.leave.hidden = false; syncKeys(); el.screen.classList.remove('idle');
   lastSeq = -1; cancelAnimationFrame(raf); raf = requestAnimationFrame(render);
   refreshBanner();
   const g = game;
@@ -197,7 +203,7 @@ function stopGame() {
   if (game) { game.worker.terminate(); game = null; }
   cancelAnimationFrame(raf); kb = 0; prevStart = false;
   if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
-  el.chat.hidden = true; el.log.textContent = ''; el.leave.hidden = true; banner('');
+  syncKeys(); el.chat.hidden = true; el.log.textContent = ''; el.leave.hidden = true; banner('');
 }
 function toMenu(msg) {
   stopGame(); el.menu.hidden = false; show('lobby'); setStatus(msg || ''); display.reset(); el.screen.classList.add('idle');

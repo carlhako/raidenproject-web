@@ -54,3 +54,15 @@ h2 { font-size: 1rem; margin: 18px 0 6px; text-align: left; color: var(--ink); }
 @media (max-width: 520px) { .bigcode { font-size: 2.2rem; } }
 
 #filters button:disabled { opacity: .4; cursor: not-allowed; }
+
+#keys { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; gap: 10px; background: #000a; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: .75rem; pointer-events: none; }
+#keys[hidden] { display: none; }
+.kl { display: block; color: var(--mute); margin-bottom: 3px; }
+.krow { display: flex; gap: 4px; }
+.dpad { display: grid; grid-template-areas: ". u ." "l . r" ". d ."; gap: 3px; width: max-content; }
+.k { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 4px; border: 1px solid var(--line); border-radius: 6px; font-style: normal; font-weight: 700; color: var(--ink); background: #fff1; line-height: 1.05; }
+.k small { font-size: .6rem; font-weight: 400; color: var(--mute); }
+.k.wide { min-width: 52px; }
+.k.on { background: var(--accent); color: #2a0f20; border-color: var(--accent); } .k.on small { color: #2a0f20; }
+.kfoot { color: var(--mute); font-size: .68rem; text-align: center; }
+@media (max-width: 900px) { #keys { display: none; } }
