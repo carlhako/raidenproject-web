@@ -1,8 +1,9 @@
 // Runs the wasm game on its own thread. The game never yields, so everything the page must do
 // for it (video, audio, input, netplay) goes through shared memory; sends go out via postMessage.
-importScripts('raiden.js');
+importScripts('raiden.js', 'mod/ram-map.js', 'mod/bot.js');
 
-const SEQ = 0, W = 1, H = 2, FRAME = 3, AUD_W = 4, AUD_R = 5, PAD0 = 6, LOGN = 8, WAKE = 9, SLEEP = 10, ROLE = 11, LOCK = 12, P2FROM = 13, DELAY = 14, CATCH = 15;
+const SEQ = 0, W = 1, H = 2, FRAME = 3, AUD_W = 4, AUD_R = 5, PAD0 = 6, LOGN = 8, WAKE = 9, SLEEP = 10, ROLE = 11, LOCK = 12, P2FROM = 13, DELAY = 14, CATCH = 15,
+  BOT = 16, BOTDBG = 17;
 const AUD_CAP = 32768, AUD_MAX = 8820;      // frames; drop new audio when more than ~200 ms is queued
 const ROLE_HOST = 0, ROLE_P2 = 2;
 const START_BIT = 8;                         // active-low Start in the pad word
@@ -10,7 +11,7 @@ const FRAME_MS = 1000 / 60;                  // NTSC
 
 self.onmessage = async (e) => {
   if (e.data.type !== 'start') return;
-  const { ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab } = e.data;
+  const { ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab, mode } = e.data;
   const ctrl = new Int32Array(ctrlSab), fb = new Uint8Array(fbSab), aud = new Int16Array(audSab), log = new Uint32Array(logSab);
   const fatal = (m) => { postMessage({ type: 'fatal', msg: m }); };
   // Firefox's err.stack has no "Name: message" line, so put it in front ourselves.
@@ -33,6 +34,7 @@ self.onmessage = async (e) => {
   // Per frame the game needs (p1, p2) pad words. The host plays alone from its own pad until the lock frame;
   // after that, and for everybody else (watchers, player 2), they come from the confirmed input log that the
   // page fills from the server. Watching = replaying that log from frame 0 (the game is deterministic).
+  let p2InGame = false;
   let cur = 0, began = -1, t0 = 0, rebuf = true, cp1 = 0xffff, cp2 = 0xffff, catching = false;
   const role = () => Atomics.load(ctrl, ROLE);
   const logn = () => Atomics.load(ctrl, LOGN);
@@ -44,13 +46,28 @@ self.onmessage = async (e) => {
       Atomics.wait(ctrl, WAKE, w, 100);
     }
   }
+  // Modified mode, host only: the AI wingman plays player 2. Its pad words go to the server with
+  // the host's own (8-byte input message), so they land in the input log and everyone replays them.
+  let bot = null, mem = null;
+  function botPad(lead) {
+    if (mode !== 'modified' || !Atomics.load(ctrl, BOT)) { bot = null; return -1; }
+    if (!bot) bot = RaidenMod.createBot({ player: 1 });
+    bot.config.extraLead = lead;
+    const p = bot.step(mem, cur);
+    if (Atomics.load(ctrl, BOTDBG) && bot.debug) postMessage({ type: 'botdbg', d: bot.debug, s: RaidenMod.ram.read(mem) });
+    return (~p) & 0xffff;
+  }
   function beginFrame() {
     if (began === cur) return; began = cur;
     const r = role(), lock = Atomics.load(ctrl, LOCK), delay = Atomics.load(ctrl, DELAY), local = Atomics.load(ctrl, PAD0) & 0xffff;
     if (r === ROLE_HOST) {
-      if (lock < 0 || cur < lock) { cp1 = local; cp2 = 0xffff; postMessage({ type: 'input', frame: cur, b: local }); }
-      else { waitLog(1); const v = log[cur]; cp1 = v & 0xffff; cp2 = v >>> 16; }
-      if (lock >= 0 && cur + delay >= lock) postMessage({ type: 'input', frame: cur + delay, b: local });
+      const prelock = lock < 0 || cur < lock;
+      const b2 = botPad(prelock ? 0 : delay);
+      if (prelock) {
+        cp1 = local; cp2 = b2 >= 0 ? b2 : 0xffff;
+        postMessage(b2 >= 0 ? { type: 'input', frame: cur, b: local, b2 } : { type: 'input', frame: cur, b: local });
+      } else { waitLog(1); const v = log[cur]; cp1 = v & 0xffff; cp2 = v >>> 16; }
+      if (lock >= 0 && cur + delay >= lock) postMessage(b2 >= 0 && !prelock ? { type: 'input', frame: cur + delay, b: local, b2 } : { type: 'input', frame: cur + delay, b: local });
     } else {
       const lag = logn() - cur;
       if (rebuf || lag <= 0) { waitLog(r === ROLE_P2 ? 1 : 6); rebuf = false; }
@@ -59,7 +76,10 @@ self.onmessage = async (e) => {
         const f2 = Atomics.load(ctrl, P2FROM), T = cur + delay;
         if (T >= f2) {
           let b = local;
-          if (T >= f2 + 4 && T < f2 + 14) b &= ~START_BIT & 0xffff;       // the Start press that asked to join, so the game adds P2
+          // the Start press that asked to join, so the game adds P2; skipped when player 2 is already
+          // in the game (taking over from the AI wingman), where Start would pause instead
+          if (T === f2 + 4) p2InGame = mem ? RaidenMod.ram.read(mem).players[1].active : false;
+          if (T >= f2 + 4 && T < f2 + 14 && !p2InGame) b &= ~START_BIT & 0xffff;
           postMessage({ type: 'input', frame: T, b });
         }
       }
@@ -134,6 +154,8 @@ self.onmessage = async (e) => {
     }],
   }); } catch (err) { return fatal('Cannot start the game: ' + describe(err)); }
   self.psx.mod = mod;
+  mod._psx_set_mode(mode === 'modified' ? 1 : 0);
+  { const ramOff = mod._psx_ram_ptr(), spOff = mod._psx_scratch_ptr(); mem = RaidenMod.ram.accessor(() => mod.HEAPU8, ramOff, spOff); }
   postMessage({ type: 'started' });
   try { mod.callMain([]); } catch (err) { fatal(describe(err)); }
 };

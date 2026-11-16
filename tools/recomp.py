@@ -114,6 +114,16 @@ if os.path.exists(PATCH):
     for m in re.finditer(r'void\s+' + NAME + r'_([0-9a-f]{8})\s*\(\s*void\s*\)\s*\{', open(PATCH).read()):
         overrides.add(int(m.group(1), 16))
     entries |= overrides
+# mode-gated hooks (analysis/hooks_<name>.txt, one address per line): the generated body becomes
+# <name>_<addr>_orig and <name>_<addr> becomes a wrapper that calls mod_<name>_<addr>() in Modified
+# mode (mod_mode != 0, see runtime/mod_<name>.c) and the original otherwise.
+HOOKS = os.path.join(ROOT, 'analysis', f'hooks_{NAME}.txt')
+hooks = set()
+if os.path.exists(HOOKS):
+    for line in open(HOOKS):
+        line = line.split('#')[0].strip()
+        if line: hooks.add(int(line, 16))
+    entries |= hooks
 # ---------------------------------------------------------------- jump tables
 def resolve_const(reg, a, lo, depth=0):
     """Find the constant value of `reg` just before address a, scanning backwards linearly."""
@@ -557,12 +567,14 @@ for e in allf:
     if e in overrides: continue
     src, missing = gen_func(funcs[e])
     if missing: problems.append((e, missing))
+    if e in hooks: src = src.replace(f'void {fname(e)}(void) {{', f'void {fname(e)}_orig(void) {{', 1)
     bodies.append((e, src))
 
 hdr = ['#pragma once', '#include "../runtime/recomp.h"']
 for e in allf: hdr.append(f'void {fname(e)}(void);')
 hdr_extra = [e for e in overrides if e not in funcs]
 for e in hdr_extra: hdr.append(f'void {fname(e)}(void);')
+for e in sorted(hooks): hdr.append(f'void {fname(e)}_orig(void); void mod_{fname(e)}(void);')
 open(os.path.join(OUT, f'{NAME}_funcs.h'), 'w').write('\n'.join(hdr) + '\n')
 
 NFILES = max(1, min(12, (len(bodies) + 199) // 200))
@@ -578,8 +590,16 @@ with open(os.path.join(OUT, f'{NAME}_dispatch.c'), 'w') as o:
     for e in sorted(set(allf) | overrides): o.write(f'  {{0x{e:08x}, {fname(e)}}},\n')
     o.write('};\n')
     o.write(f'const Program prog_{NAME} = {{"{NAME}", 0x{PC0:08x}, 0x{BASE:08x}, 0x{SIZE:x}, 0x{CRC:08x}u, tbl, {len(set(allf) | overrides)}}};\n')
+if hooks:
+    missing_h = [e for e in hooks if e not in funcs or e in overrides]
+    if missing_h: sys.exit(f'hooks_{NAME}.txt: not a translated function: {[hex(x) for x in missing_h]}')
+    with open(os.path.join(OUT, f'{NAME}_hooks.c'), 'w') as o:
+        o.write(f'#include "{NAME}_funcs.h"\n\n')
+        for e in sorted(hooks):
+            o.write(f'void {fname(e)}(void) {{ if (mod_mode) TAILCALL(mod_{fname(e)}()); TAILCALL({fname(e)}_orig()); }}\n')
 with open(os.path.join(OUT, f'{NAME}.files'), 'w') as o:
-    o.write(' '.join([f'gen/{NAME}_code_{k:02d}.c' for k in range(NFILES)] + [f'gen/{NAME}_dispatch.c'] + ([f'gen/{NAME}_patch.c'] if overrides else [])))
+    o.write(' '.join([f'gen/{NAME}_code_{k:02d}.c' for k in range(NFILES)] + [f'gen/{NAME}_dispatch.c'] + ([f'gen/{NAME}_patch.c'] if overrides else [])
+                     + ([f'gen/{NAME}_hooks.c'] if hooks else [])))
 if overrides:
     import shutil
     shutil.copy(PATCH, os.path.join(OUT, f'{NAME}_patch.c'))

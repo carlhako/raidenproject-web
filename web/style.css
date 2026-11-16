@@ -55,6 +55,7 @@ h2 { font-size: 1rem; margin: 18px 0 6px; text-align: left; color: var(--ink); }
 #games li { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: .9rem; }
 #games li.empty { color: var(--mute); justify-content: center; }
 #games .info { flex: 1; min-width: 0; } #games .info small { display: block; color: var(--mute); }
+#games .tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: .7rem; font-weight: 600; background: var(--accent2); color: #08202b; vertical-align: 1px; }
 #games button { width: auto; margin: 0; padding: 6px 14px; background: var(--accent2); color: #08202b; }
 #lobby-log { height: 84px; overflow-y: auto; text-align: left; font-size: .82rem; margin-top: 10px; color: var(--mute); }
 #lobby-log b { color: var(--ink); } #lobby-input { width: 100%; margin-top: 4px; }
@@ -79,3 +80,9 @@ h2 { font-size: 1rem; margin: 18px 0 6px; text-align: left; color: var(--ink); }
 .k.on { background: var(--accent); color: #2a0f20; border-color: var(--accent); } .k.on small { color: #2a0f20; }
 .kfoot { color: var(--mute); font-size: .68rem; text-align: center; }
 @media (max-width: 900px) { #keys { display: none; } }
+.modes { display: flex; gap: 8px; }
+.modes button { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.modes button small { font-weight: 400; font-size: .72rem; opacity: .8; }
+.modes #btn-play-mod { background: var(--accent2); color: #08202b; }
+#botdbg { position: absolute; pointer-events: none; image-rendering: pixelated; }
+@media (max-width: 420px) { .modes { flex-direction: column; gap: 0; } }

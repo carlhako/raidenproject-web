@@ -72,3 +72,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t psx_state_hash(void) {
     h = (h ^ (uint32_t)cycles) * 16777619u;
     return h;
 }
+
+/* Modified mode and RAM access for the page's mod layer (bot, debug tools). */
+EMSCRIPTEN_KEEPALIVE void psx_set_mode(int m) { mod_mode = m; }
+EMSCRIPTEN_KEEPALIVE uint8_t *psx_ram_ptr(void) { return ram; }
+EMSCRIPTEN_KEEPALIVE uint8_t *psx_scratch_ptr(void) { return scratch; }

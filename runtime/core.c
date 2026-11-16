@@ -343,6 +343,7 @@ int main(int argc, char **argv) {
     if (!bin) { snprintf(pbuf, sizeof pbuf, "%s/disc/Raiden Project, The (USA).bin", data_dir); bin = pbuf; }
     snprintf(ebuf, sizeof ebuf, "%s/extracted/SCUS_944.02", data_dir);
     exe_path = ebuf;
+    if (getenv("PSX_MOD")) mod_mode = atoi(getenv("PSX_MOD"));
     if (getenv("PSX_RAIDEN2")) { snprintf(ebuf, sizeof ebuf, "%s/extracted/JJ3X/PSJJ3.EXE", data_dir); bios_boot_raiden2(); }
     signal(SIGSEGV, segv); signal(SIGBUS, segv); signal(SIGFPE, segv);
     cd_init(bin);

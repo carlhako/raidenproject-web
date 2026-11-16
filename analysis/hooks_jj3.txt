@@ -1,0 +1,3 @@
+# Raiden II functions routed through a Modified-mode hook (tools/recomp.py, runtime/mod_jj3.c).
+# In Original mode the wrapper calls the untouched recompiled function, so the game is unchanged.
+8005a18c    # ship object update (movement, bounds); mod_jj3_8005a18c just calls the original for now

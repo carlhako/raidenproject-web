@@ -31,7 +31,7 @@ extracted/SCUS_944.02:
 	$(MAKE) extract
 
 define PROG_RULE
-gen/$(1).stamp: tools/recomp.py extracted/SCUS_944.02 analysis/rea_$(1).txt $(wildcard analysis/extra_$(1).txt) $(wildcard analysis/patch_$(1).c)
+gen/$(1).stamp: tools/recomp.py extracted/SCUS_944.02 analysis/rea_$(1).txt $(wildcard analysis/extra_$(1).txt) $(wildcard analysis/patch_$(1).c) $(wildcard analysis/hooks_$(1).txt)
 	@mkdir -p gen
 	python3 -I tools/recomp.py $(1) $$(EXE_$(1))
 	@touch $$@

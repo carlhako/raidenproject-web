@@ -17,6 +17,10 @@ extern unsigned exec_epoch;   /* bumped by every Exec(): native frames of the pr
 extern uint32_t R[32];
 extern uint32_t HI, LO, PC;
 
+/* Game mode: 0 = original Raiden II, 1 = Modified (mod hooks active, see analysis/hooks_*.txt).
+ * Set before the game starts; never changes during a game (netplay determinism). */
+extern int mod_mode;
+
 /* ---- memory ---- */
 #define RAM_SIZE 0x200000
 extern uint8_t ram[RAM_SIZE];

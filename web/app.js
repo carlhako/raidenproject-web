@@ -5,7 +5,7 @@ const el = { menu: $('menu'), status: $('status'), progress: $('progress'), bar:
   chatInput: $('chat-input'), screen: $('screen'), own: $('own-disc'), stage: $('stage'), filters: $('filters'), banner: $('banner'), leave: $('btn-leave'),
   games: $('games'), online: $('online'), name: $('name'), lobbyLog: $('lobby-log'), lobbyInput: $('lobby-input') };
 const display = createDisplay(el.screen);
-const CTRL = { SEQ: 0, W: 1, H: 2, FRAME: 3, AUD_W: 4, AUD_R: 5, PAD0: 6, LOGN: 8, WAKE: 9, ROLE: 11, LOCK: 12, P2FROM: 13, DELAY: 14, CATCH: 15 };
+const CTRL = { SEQ: 0, W: 1, H: 2, FRAME: 3, AUD_W: 4, AUD_R: 5, PAD0: 6, LOGN: 8, WAKE: 9, ROLE: 11, LOCK: 12, P2FROM: 13, DELAY: 14, CATCH: 15, BOT: 16, BOTDBG: 17 };
 const ROLES = { host: 0, watch: 1, p2: 2 };
 
 function setStatus(msg, err = false) { el.status.textContent = msg; el.status.classList.toggle('err', err); }
@@ -137,6 +137,20 @@ let autoshoot = storeGet('autoshoot') === true;
 autoEl.checked = autoshoot;
 function setAutoshoot(on) { autoshoot = on; autoEl.checked = on; storeSet('autoshoot', on); updatePad(); }
 autoEl.addEventListener('change', () => { setAutoshoot(autoEl.checked); autoEl.blur(); });
+// Game settings (Modified games, host only): the AI wingman plays player 2. The host's worker runs it
+// and sends its pad with the host's own, so watchers simply replay it. A person joining takes over.
+const botEl = $('opt-bot'), botRow = $('bot-row');
+let botWanted = storeGet('bot') === true;
+const canBot = () => !!(game && game.role === 'host' && game.mode === 'modified');
+function syncBot() { botRow.hidden = !canBot(); botEl.checked = !!(game && game.bot); }
+function setBot(on, remember = true) {
+  if (!canBot()) return;
+  if (on && game.p2) { banner('Player 2 is taken by a person.', '', 2500); on = false; }
+  if (remember) { botWanted = on; storeSet('bot', on); }
+  if (game.bot !== on) { game.bot = on; Atomics.store(game.ctrl, CTRL.BOT, on ? 1 : 0); sendWs({ t: 'bot', on }); }
+  syncBot();
+}
+botEl.addEventListener('change', () => { setBot(botEl.checked); botEl.blur(); });
 const typing = (e) => e.target instanceof HTMLInputElement && e.target.type !== 'checkbox';
 addEventListener('keydown', (e) => {
   if (typing(e) || !game) return;
@@ -144,6 +158,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyK' && !e.repeat) { keysWanted = !keysWanted; try { localStorage.setItem('keys', keysWanted ? '1' : '0'); } catch {} syncKeys(); return; }
   if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); cycleFilter(); return; }
   if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); setAutoshoot(!autoshoot); banner(`Autoshoot ${autoshoot ? 'on' : 'off'}`, autoshoot ? 'go' : '', 1500); return; }
+  if (e.code === 'KeyB' && !e.repeat && canBot()) { e.preventDefault(); setBot(!game.bot); banner(`AI wingman ${game.bot ? 'on' : 'off'}`, game.bot ? 'go' : '', 1500); return; }
   if (e.code in KEYS) { e.preventDefault(); kb |= KEYS[e.code]; latched.set(KEYS[e.code], performance.now() + 40); updatePad(); }
 });
 addEventListener('keyup', (e) => { if (game && e.code in KEYS) { kb &= ~KEYS[e.code]; updatePad(); } });
@@ -156,6 +171,29 @@ function onStartPressed() {
   if (Atomics.load(game.ctrl, CTRL.CATCH)) return banner('Still catching up to the live game…');
   if (game.p2) return banner('Player 2 is already taken. Keep watching!');
   if (game.joining) return; game.joining = true; sendWs({ t: 'join' });
+}
+
+// ---------------------------------------------------------------- AI wingman debug view (?botdebug)
+// Draws what the bot sees over the game: bullets (red), air enemies (orange), pickups (green), its
+// ship (cyan), the target lane and the plan it picked.
+const botDebug = new URLSearchParams(location.search).has('botdebug');
+let dbgCanvas = null;
+function drawBotDebug(m) {
+  if (!botDebug) return;
+  if (!dbgCanvas) { dbgCanvas = document.createElement('canvas'); dbgCanvas.id = 'botdbg'; el.stage.append(dbgCanvas); }
+  const c = dbgCanvas, r = (document.getElementById('screen') || el.screen).getBoundingClientRect(), sr = el.stage.getBoundingClientRect();   // display.js may swap the canvas
+  Object.assign(c.style, { left: r.left - sr.left + 'px', top: r.top - sr.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  const w = game ? Atomics.load(game.ctrl, CTRL.W) || 368 : 368, h = game ? Atomics.load(game.ctrl, CTRL.H) || 240 : 240;
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext('2d'); g.clearRect(0, 0, w, h);
+  if (!m) return;
+  const X = (x) => x + 58, Y = (y) => (316 - y) * 0.75, ring = (x, y, rad, col) => { g.strokeStyle = col; g.beginPath(); g.ellipse(X(x), Y(y), rad, rad * 0.75, 0, 0, 7); g.stroke(); };
+  for (const b of m.s.bullets) ring(b.x, b.y, 9, '#f44');
+  for (const e of m.s.enemies) ring(e.x, e.y, e.layer === 0x15 || e.cls === 9 ? 18 : 6, e.layer === 0x15 || e.cls === 9 ? '#fa0' : '#888');
+  for (const it of m.s.items) ring(it.x, it.y, 6, '#4f4');
+  const d = m.d, [mx, my] = d.me; ring(mx, my, 6, '#0ff');
+  if (d.targetX !== null) { g.strokeStyle = '#0ff6'; g.beginPath(); g.moveTo(X(d.targetX), 0); g.lineTo(X(d.targetX), h); g.stroke(); }
+  if (d.item) { g.strokeStyle = '#4f48'; g.beginPath(); g.moveTo(X(mx), Y(my)); g.lineTo(X(d.item[0]), Y(d.item[1])); g.stroke(); }
 }
 
 // ---------------------------------------------------------------- game session
@@ -172,10 +210,11 @@ function refreshBanner() {
       const n = Atomics.load(c, CTRL.LOGN), f = Atomics.load(c, CTRL.FRAME);
       return banner(`Catching up to ${game.host}'s game… ${n ? Math.floor(100 * f / n) : 0}%`);
     }
-    return banner(game.p2 ? `Watching ${game.host} and ${game.p2}` : `Watching ${game.host}: press Start to join as player 2`, game.p2 ? '' : 'go');
+    if (game.p2) return banner(`Watching ${game.host} and ${game.p2}`);
+    return banner(game.bot ? `Watching ${game.host} and the AI wingman: press Start to take over player 2` : `Watching ${game.host}: press Start to join as player 2`, 'go');
   }
   if (game.role === 'p2') return banner(`You are player 2 in ${game.host}'s game`, 'go');
-  const o = game.p2 ? ` with ${game.p2}` : ''; banner(o ? `Playing${o}` : '');
+  const o = game.p2 ? ` with ${game.p2}` : game.bot ? ' with the AI wingman' : ''; banner(o ? `Playing${o}` : '');
 }
 setInterval(() => { if (game && Date.now() >= holdUntil) refreshBanner(); }, 250);
 
@@ -190,11 +229,13 @@ async function startGame(role, opts = {}) {
   Atomics.store(ctrl, CTRL.PAD0, 0xffff); Atomics.store(ctrl, CTRL.ROLE, ROLES[role]); Atomics.store(ctrl, CTRL.LOCK, opts.lockFrom ?? -1);
   Atomics.store(ctrl, CTRL.P2FROM, opts.p2From ?? -1); Atomics.store(ctrl, CTRL.DELAY, opts.delay || 0);
   const worker = new Worker('game-worker.js');
-  game = { worker, ctrl, log, fb, role, id: opts.id, host: opts.host || el.name.value || 'You', p2: opts.p2 || null, joining: false, localHash: new Map() };
+  game = { worker, ctrl, log, fb, role, id: opts.id, mode: opts.mode || 'original', bot: !!opts.bot, host: opts.host || el.name.value || 'You', p2: opts.p2 || null, joining: false, localHash: new Map() };
+  if (botDebug) Atomics.store(ctrl, CTRL.BOTDBG, 1);
   worker.onmessage = (e) => onWorker(e.data);
   worker.onerror = (e) => { const m = `${e.message} (${e.filename}:${e.lineno}:${e.colno})`; toast('Worker error: ' + m); reportError('worker.error', m); };
   worker.onmessageerror = () => reportError('worker.messageerror', 'message could not be deserialized');
-  worker.postMessage({ type: 'start', ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab, memcard: b64ToCard(opts.memcard) });
+  worker.postMessage({ type: 'start', ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab, mode: game.mode, memcard: b64ToCard(opts.memcard) });
+  syncBot(); if (role === 'host' && botWanted) setBot(true, false);
   el.menu.hidden = true; el.chat.hidden = false; el.leave.hidden = false; syncKeys(); el.screen.classList.remove('idle');
   lastSeq = -1; cancelAnimationFrame(raf); raf = requestAnimationFrame(render);
   refreshBanner();
@@ -227,9 +268,14 @@ function render() {
 function onWorker(m) {
   switch (m.type) {
     case 'input':                                    // local input for frame m.frame -> server
-      if (ws && ws.readyState === 1 && game && game.role !== 'watch') { const b = new DataView(new ArrayBuffer(6)); b.setUint32(0, m.frame, true); b.setUint16(4, m.b, true); ws.send(b.buffer); }
+      if (ws && ws.readyState === 1 && game && game.role !== 'watch') {
+        const b = new DataView(new ArrayBuffer(m.b2 === undefined ? 6 : 8)); b.setUint32(0, m.frame, true); b.setUint16(4, m.b, true);
+        if (m.b2 !== undefined) b.setUint16(6, m.b2, true);       // AI wingman's pad (host, Modified games)
+        ws.send(b.buffer);
+      }
       break;
     case 'hash': sendWs({ t: 'hash', frame: m.frame, h: m.h }); break;
+    case 'botdbg': drawBotDebug(m); break;
     case 'memcard': if (game && game.role === 'host') storeSet('memcard', m.files); break;
     case 'fatal': toast('Game crashed: ' + m.msg, 20000); console.error(m.msg); reportError('fatal', m.msg); break;
     case 'log': if (/FATAL|cannot/i.test(m.msg)) { console.warn(m.msg); reportError('worker.log', m.msg); } break;
@@ -240,7 +286,7 @@ function stopGame() {
   if (game) { game.worker.terminate(); game = null; }
   cancelAnimationFrame(raf); kb = 0; prevStart = false;
   if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
-  syncKeys(); el.chat.hidden = true; el.log.textContent = ''; el.leave.hidden = true; banner('');
+  syncKeys(); syncBot(); drawBotDebug(null); el.chat.hidden = true; el.log.textContent = ''; el.leave.hidden = true; banner('');
 }
 function toMenu(msg) {
   stopGame(); el.menu.hidden = false; show('lobby'); setStatus(msg || ''); display.reset(); el.screen.classList.add('idle');
@@ -278,9 +324,9 @@ function onWs(data) {
     case 'ping': sendWs({ t: 'pong' }); break;
     case 'lobby': renderGames(m); break;
     case 'lobbychat': el.lobbyLog.textContent = ''; m.lines.forEach((l) => chatLine(l, null, true)); break;
-    case 'hosting': startGame('host', { id: m.id, host: myName(), memcard: storeGet('memcard') || {} }); chatLine({ text: 'Your game is live: anyone can watch and join as player 2.' }, 'sys'); break;
+    case 'hosting': startGame('host', { id: m.id, mode: m.mode, host: myName(), memcard: storeGet('memcard') || {} }); chatLine({ text: 'Your game is live: anyone can watch and join as player 2.' }, 'sys'); break;
     case 'watching':
-      startGame('watch', { id: m.id, host: m.host, memcard: m.memcard, lockFrom: m.lockFrom, p2From: m.p2From, delay: m.delay, p2: m.p2 });
+      startGame('watch', { id: m.id, mode: m.mode, bot: m.bot, host: m.host, memcard: m.memcard, lockFrom: m.lockFrom, p2From: m.p2From, delay: m.delay, p2: m.p2 });
       (m.chat || []).forEach((l) => chatLine(l)); chatLine({ text: `Watching ${m.host}. Press Start to join as player 2.` }, 'sys'); break;
     case 'seg':
       if (!game) break;
@@ -288,7 +334,11 @@ function onWs(data) {
       game.p2 = m.p2; break;
     case 'you_p2': if (game) { game.role = 'p2'; Atomics.store(game.ctrl, CTRL.ROLE, ROLES.p2); game.joining = false; refreshBanner(); } break;
     case 'joinfail': if (game) { game.joining = false; banner(m.msg, '', 3000); } break;
-    case 'p2left': if (game) { game.p2 = null; chatLine({ text: 'Player 2 left.' }, 'sys'); } break;
+    case 'p2left': if (game) { game.p2 = null; chatLine({ text: 'Player 2 left.' }, 'sys'); if (botWanted) setBot(true, false); } break;
+    case 'bot': if (game && game.role !== 'host') { game.bot = m.on; refreshBanner(); } break;
+    case 'botoff':                                   // a person took over player 2, or the server refused
+      if (game && game.role === 'host') { game.bot = false; Atomics.store(game.ctrl, CTRL.BOT, 0); syncBot(); if (m.msg) banner(m.msg, '', 2500); }
+      break;
     case 'sys': chatLine({ text: m.text }, 'sys'); break;
     case 'chat': chatLine(m); break;
     case 'desync': reportError('desync', `frame ${m.frame}`); toast(`Desync detected at frame ${m.frame}: this game is no longer in sync with the host. Leave and watch again.`, 30000); break;
@@ -312,22 +362,24 @@ function renderGames(m) {
   if (!m.sessions.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Nobody is playing right now.'; el.games.append(li); return; }
   for (const s of m.sessions) {
     const li = document.createElement('li'), info = document.createElement('div'), btn = document.createElement('button');
-    info.className = 'info'; info.textContent = s.p2 ? `${s.host} + ${s.p2}` : s.host;
-    const sm = document.createElement('small'); sm.textContent = `${s.p2 ? '2 players' : 'Player 2 free'} · ${s.watchers} watching · ${fmtTime(s.secs)}`; info.append(sm);
+    info.className = 'info'; info.textContent = s.p2 ? `${s.host} + ${s.p2}` : s.bot ? `${s.host} + AI wingman` : s.host;
+    if (s.mode === 'modified') { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Modified'; info.append(t); }
+    const sm = document.createElement('small'); sm.textContent = `${s.p2 ? '2 players' : s.bot ? 'Player 2 free to take over' : 'Player 2 free'} · ${s.watchers} watching · ${fmtTime(s.secs)}`; info.append(sm);
     btn.textContent = 'Watch'; btn.onclick = () => watch(s.id);
     li.append(info, btn); el.games.append(li);
   }
 }
 
 // ---------------------------------------------------------------- menu wiring
-async function play() {
-  try { await connect(); storeSet('name', myName()); sendWs({ t: 'hello', name: myName() }); sendWs({ t: 'host', name: myName(), memcard: storeGet('memcard') || {} }); } catch (e) { setStatus(e.message, true); }
+async function play(mode) {
+  try { await connect(); storeSet('name', myName()); sendWs({ t: 'hello', name: myName() }); sendWs({ t: 'host', name: myName(), mode, memcard: storeGet('memcard') || {} }); } catch (e) { setStatus(e.message, true); }
 }
 async function watch(id) {
   try { await connect(); storeSet('name', myName()); setStatus('Joining the game…'); sendWs({ t: 'watch', id, name: myName() }); } catch (e) { setStatus(e.message, true); }
 }
 el.name.value = storeGet('name') || '';
-$('btn-play').onclick = play;
+$('btn-play').onclick = () => play('original');
+$('btn-play-mod').onclick = () => play('modified');
 $('btn-leave').onclick = () => { sendWs({ t: 'leave' }); toMenu(); };
 $('btn-full').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else el.stage.requestFullscreen(); };
 $('chat-form').addEventListener('submit', (e) => { e.preventDefault(); const t = el.chatInput.value.trim(); if (t) sendWs({ t: 'chat', text: t }); el.chatInput.value = ''; el.chatInput.blur(); });

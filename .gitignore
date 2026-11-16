@@ -13,6 +13,7 @@
 !/analysis/rea_*.txt
 !/analysis/extra_*.txt
 !/analysis/patch_*.c
+!/analysis/hooks_*.txt
 __pycache__/
 *.pyc
 !/web.mk

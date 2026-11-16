@@ -119,7 +119,7 @@ const bcastBin = (s, buf, except) => members(s).forEach(w => { if (w !== except 
 
 function lobbyList() {
   const now = Date.now();
-  return [...sessions.values()].map(s => ({ id: s.id, host: s.host.name, p2: s.p2 ? s.p2.name : null, watchers: s.watchers.size,
+  return [...sessions.values()].map(s => ({ id: s.id, host: s.host.name, p2: s.p2 ? s.p2.name : null, bot: s.bot, mode: s.mode, watchers: s.watchers.size,
     secs: Math.round((now - s.started) / 1000), frames: s.n, locked: s.lockFrom >= 0 }));
 }
 let lobbyTimer = null;
@@ -144,6 +144,7 @@ function pump(s) {
     const f = s.n; const a = s.in1.get(f); if (a === undefined) break;
     let b = 0xffff;
     if (s.p2 && f >= s.p2From) { b = s.in2.get(f); if (b === undefined) break; }
+    else { const h = s.in2.get(f); if (h !== undefined) b = h; }   // AI wingman pad, sent along with the host's
     s.in1.delete(f); s.in2.delete(f);
     if (append(s, (a & 0xffff) | ((b & 0xffff) << 16)) === undefined) return;
     out.push(s.log[f]);
@@ -185,13 +186,15 @@ wss.on('connection', ws => {
     if (now - ws.windowStart > 1000) { ws.windowStart = now; ws.msgs = 0; }
     if (++ws.msgs > 300) return;
     const s = ws.session;
-    if (isBinary) {                                    // input: [u32 frame][u16 buttons]
-      if (!s || data.length !== 6) return;
+    if (isBinary) {                                    // input: [u32 frame][u16 buttons] (+ [u16 p2 buttons] from a host running the AI wingman)
+      if (!s || (data.length !== 6 && data.length !== 8)) return;
       const f = data.readUInt32LE(0), b = data.readUInt16LE(4);
       if (ws === s.host) {
+        // the host drives player 2 (AI wingman) only in Modified games, and only for frames no human player 2 owns
+        const own2 = data.length === 8 && s.mode === 'modified' && (!s.p2 || f < s.p2From), b2 = own2 ? data.readUInt16LE(6) : 0xffff;
         if (s.lockFrom < 0 || f < s.lockFrom) {        // host playing alone: this is the frame itself
-          if (f === s.n) { append(s, b | (0xffff << 16)); bcastBin(s, frameMsg(f, [s.log[f]]), ws); s.last = now; }
-        } else if (f < s.n + 256 && f >= s.n) { s.in1.set(f, b); pump(s); s.last = now; }
+          if (f === s.n) { append(s, b | (b2 << 16)); bcastBin(s, frameMsg(f, [s.log[f]]), ws); s.last = now; }
+        } else if (f < s.n + 256 && f >= s.n) { if (own2) s.in2.set(f, b2); s.in1.set(f, b); pump(s); s.last = now; }
       } else if (ws === s.p2 && f >= s.p2From && f >= s.n && f < s.n + 256) { s.in2.set(f, b); pump(s); }
       return;
     }
@@ -204,17 +207,18 @@ wss.on('connection', ws => {
         if (sessions.size >= MAX_SESSIONS) return send(ws, { t: 'error', msg: 'Server is full, try again later.' });
         ws.name = cleanName(m.name);
         const mc = (m.memcard && typeof m.memcard === 'object') ? m.memcard : {};
-        const ns = { id: sid(), host: ws, p2: null, watchers: new Set(), log: new Uint32Array(1 << 14), n: 0, lockFrom: -1, p2From: -1, delay: 0,
+        const mode = m.mode === 'modified' ? 'modified' : 'original';
+        const ns = { id: sid(), mode, bot: false, host: ws, p2: null, watchers: new Set(), log: new Uint32Array(1 << 14), n: 0, lockFrom: -1, p2From: -1, delay: 0,
           in1: new Map(), in2: new Map(), memcard: mc, chat: [], hostHash: new Map(), started: Date.now(), last: Date.now() };
         sessions.set(ns.id, ns); ws.session = ns; ws.role = 'host';
-        send(ws, { t: 'hosting', id: ns.id }); lobbyDirty();
+        send(ws, { t: 'hosting', id: ns.id, mode }); lobbyDirty();
         break;
       }
       case 'watch': {
         if (s) return;
         const t = sessions.get(String(m.id)); if (!t) return send(ws, { t: 'error', msg: 'That game has ended.' });
         ws.name = cleanName(m.name); ws.session = t; ws.role = 'watch'; t.watchers.add(ws);
-        send(ws, { t: 'watching', id: t.id, host: t.host.name, memcard: t.memcard, n: t.n, lockFrom: t.lockFrom, p2From: t.p2From, delay: t.delay,
+        send(ws, { t: 'watching', id: t.id, mode: t.mode, bot: t.bot, host: t.host.name, memcard: t.memcard, n: t.n, lockFrom: t.lockFrom, p2From: t.p2From, delay: t.delay,
           p2: t.p2 ? t.p2.name : null, chat: t.chat });
         for (let i = 0; i < t.n; i += 16384) { const end = Math.min(t.n, i + 16384); ws.send(frameMsg(i, t.log.subarray(i, end)), { binary: true }); }
         bcast(t, { t: 'sys', text: `${ws.name} is watching.` }, ws); lobbyDirty();
@@ -223,6 +227,7 @@ wss.on('connection', ws => {
       case 'join': {                                   // a watcher asks to become player 2
         if (!s || ws.role !== 'watch') return;
         if (s.p2) return send(ws, { t: 'joinfail', msg: 'Player 2 is already taken.' });
+        if (s.bot) { s.bot = false; send(s.host, { t: 'botoff' }); bcast(s, { t: 'bot', on: false }); }   // a human takes over from the AI wingman
         const mx = Math.max(rttMs(s.host), rttMs(ws));
         const delay = s.delay || Math.max(4, Math.min(14, Math.ceil(mx / 16.7) + 3));
         const F = s.n + JOIN_MARGIN;
@@ -231,6 +236,13 @@ wss.on('connection', ws => {
         const msg = { t: 'seg', lockFrom: s.lockFrom, p2From: F, delay, p2: ws.name };
         bcast(s, msg); send(ws, { t: 'you_p2' });
         bcast(s, { t: 'sys', text: `${ws.name} joined as player 2!` }); lobbyDirty();
+        break;
+      }
+      case 'bot': {                                    // the host turns the AI wingman on or off (Modified games)
+        if (!s || ws !== s.host || s.mode !== 'modified') return;
+        const on = !!m.on; if (on === s.bot) return;
+        if (on && s.p2) return send(ws, { t: 'botoff', msg: 'Player 2 is taken by a person.' });
+        s.bot = on; bcast(s, { t: 'bot', on }); bcast(s, { t: 'sys', text: on ? 'The AI wingman joined as player 2.' : 'The AI wingman left.' }); lobbyDirty();
         break;
       }
       case 'hash': {

@@ -22,6 +22,7 @@
     <section class="side-sec" aria-label="Game settings">
       <span class="sl">Game settings</span>
       <label class="switch"><input type="checkbox" id="opt-autoshoot"><span class="track"></span><span class="stxt">Autoshoot</span><kbd>F</kbd></label>
+      <label class="switch" id="bot-row" hidden title="An AI pilot joins as player 2 (Modified games)"><input type="checkbox" id="opt-bot"><span class="track"></span><span class="stxt">AI wingman (P2)</span><kbd>B</kbd></label>
     </section>
     <section id="keys" class="side-sec" hidden aria-label="Controls">
       <span class="sl">Controls</span>
@@ -30,7 +31,7 @@
       <div class="kgrp"><span class="kl">Shoot / Bomb</span><div class="krow"><i class="k" data-bit="32768">Z<small>□ shoot</small></i><i class="k" data-bit="16384">X<small>✕ bomb</small></i><i class="k" data-bit="8192">A<small>○</small></i><i class="k" data-bit="4096">S<small>△ rapid</small></i></div></div>
       <div class="kgrp"><span class="kl">Shoulders</span><div class="krow"><i class="k" data-bit="1024">Q<small>L1</small></i><i class="k" data-bit="2048">W<small>R1</small></i><i class="k" data-bit="256">E<small>L2</small></i><i class="k" data-bit="512">R<small>R2</small></i></div></div>
       <div class="kgrp"><span class="kl">Start / Select</span><div class="krow"><i class="k wide" data-bit="8">Enter<small>Start</small></i><i class="k wide" data-bit="1">Bksp<small>Select</small></i></div></div>
-      <div class="kfoot">T chat · V filter · F autoshoot · K hide</div>
+      <div class="kfoot">T chat · V filter · F autoshoot · B wingman · K hide</div>
     </section>
   </aside>
 
@@ -41,7 +42,10 @@
     <div id="progress" hidden><div id="bar"></div></div>
     <div id="lobby" hidden>
       <label class="name">Your name <input id="name" type="text" maxlength="16" autocomplete="off" spellcheck="false" placeholder="Player"></label>
-      <button id="btn-play">Play (start a game)</button>
+      <div class="modes">
+        <button id="btn-play" data-mode="original">Raiden II<small>The original game</small></button>
+        <button id="btn-play-mod" data-mode="modified">Raiden II Modified<small>AI wingman, more to come</small></button>
+      </div>
       <h2>Live games <span id="online" class="mute"></span></h2>
       <ul id="games"><li class="empty">Nobody is playing right now.</li></ul>
       <div id="lobby-chat">
@@ -55,7 +59,7 @@
         <tr><td>D-pad</td><td>Arrow keys</td></tr><tr><td>Start (also joins a game you are watching)</td><td>Enter</td></tr><tr><td>Select</td><td>Backspace</td></tr>
         <tr><td>✕ ○ □ △</td><td>Z X A S</td></tr><tr><td>L1 R1 L2 R2</td><td>Q W E R</td></tr>
         <tr><td>Gamepad</td><td>Standard mapping</td></tr><tr><td>Chat</td><td>T</td></tr>
-        <tr><td>Cycle video filter</td><td>V</td></tr><tr><td>Toggle autoshoot</td><td>F</td></tr>
+        <tr><td>Cycle video filter</td><td>V</td></tr><tr><td>Toggle autoshoot</td><td>F</td></tr><tr><td>Toggle AI wingman (Modified)</td><td>B</td></tr>
       </table>
     </details>
   </section>

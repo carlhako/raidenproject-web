@@ -30,7 +30,12 @@ Open <http://localhost:8080> (localhost counts as a secure origin). The first vi
 56 MB disc image into the browser's private storage. For other machines serve it over HTTPS: see
 [docs/DEPLOY.md](docs/DEPLOY.md).
 
-- **Play** starts a game. Every game is public: it shows up under *Live games* for everyone.
+- **Raiden II** starts the original game; **Raiden II Modified** starts the modded version (for now:
+  the AI wingman; new weapons, levels and an easier game are planned). Every game is public: it shows
+  up under *Live games* for everyone.
+- **AI wingman (P2)** (Modified games, host, right-hand panel or `B`): a computer pilot plays player 2. It
+  dodges bullets and planes, picks targets away from your lane and collects power-ups. A watcher who
+  presses Start takes its place.
 - **Watch** a running game. Your browser replays it fast (muted, with a progress bar) until it is live.
 - **Press Start while watching** to join the game as player 2. No codes: if a game has no player 2 you can take the slot.
 - Chat: lobby chat for everybody on the menu, game chat for the players and watchers of a game (`T`).

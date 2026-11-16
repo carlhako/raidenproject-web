@@ -7,7 +7,7 @@ WEB_CFLAGS = -O2 -g0 -Iruntime -fno-strict-aliasing -fwrapv -mtail-call -fwasm-e
   -Wno-unused-variable -Wno-misleading-indentation -Wno-unused-label -Wno-unused-but-set-variable -Wno-unused-function
 WEB_LDFLAGS = -fwasm-exceptions -sSUPPORT_LONGJMP=wasm -sENVIRONMENT=worker,node -sINITIAL_MEMORY=64MB \
   -sSTACK_SIZE=16MB -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sEXPORT_NAME=createPsx -sINVOKE_RUN=0 \
-  -sEXIT_RUNTIME=0 -sEXPORTED_RUNTIME_METHODS=callMain,HEAPU8,FS -sEXPORTED_FUNCTIONS=_main,_psx_state_hash \
+  -sEXIT_RUNTIME=0 -sEXPORTED_RUNTIME_METHODS=callMain,HEAPU8,FS -sEXPORTED_FUNCTIONS=_main,_psx_state_hash,_psx_set_mode,_psx_ram_ptr,_psx_scratch_ptr \
   -sFILESYSTEM=1 --js-library web/psx-lib.js --embed-file extracted/JJ3X/PSJJ3.EXE@/extracted/PSJJ3.EXE
 
 build/web/%.o: %.c runtime/recomp.h runtime/psx.h
@@ -20,4 +20,5 @@ dist/raiden.js: $(GENSTAMP) $(WEB_OBJ) web/psx-lib.js
 
 web: dist/raiden.js
 	cp web/index.html web/style.css web/app.js web/display.js web/game-worker.js web/audio-worklet.js dist/
+	mkdir -p dist/mod && cp web/mod/*.js dist/mod/
 .PHONY: web

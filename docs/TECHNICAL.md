@@ -199,4 +199,54 @@ executables, so don't redistribute it.
 - **Desync check:** every 120 frames everybody sends a RAM/register hash; the server compares them with the host's.
 - **Limits:** about 2.4 hours per game (2^19 frames), 60 games, one memory card snapshot per game (the host's).
 - **Testing:** `node tools/node-harness.mjs <disc.bin> <frames> "300:start,3500:2start" [outdir]` runs the wasm headless
-  under Node (`2` prefix = pad 2, `HOLD=n`, `RANDOM_INPUT=1`, `SHOT_EVERY=n`).
+  under Node (`2` prefix = pad 2, `HOLD=n`, `RANDOM_INPUT=1`, `SHOT_EVERY=n`, `MODE=1` Modified mode, `HOOK=file.mjs`
+  per-frame RAM/pad hook module, see `tools/hooks/bot.mjs`).
+
+## Modified mode and the AI wingman
+
+- **Two modes.** The landing screen starts either **Raiden II** (original) or **Raiden II Modified**.
+  - The mode is chosen when the game is hosted. The server stores it, the lobby shows it, and
+    watchers receive it, so everybody boots the same game.
+  - The worker calls `_psx_set_mode()` before `main`. This sets `mod_mode` (`runtime/mod.c`).
+    Natively, `PSX_MOD=1` does the same.
+- **Mode-gated hooks** are the groundwork for new weapons, levels and difficulty.
+  - Each address in `analysis/hooks_jj3.txt` makes `tools/recomp.py` rename that function's
+    generated body to `jj3_<addr>_orig`.
+  - It also emits a wrapper in `gen/jj3_hooks.c`. The wrapper calls `mod_jj3_<addr>()`
+    (`runtime/mod_jj3.c`) when `mod_mode` is set, and the original otherwise.
+  - Original mode therefore runs exactly the old code. Its state hashes are identical to the build
+    without hooks.
+  - Hooks must be deterministic, because netplay replays only inputs.
+- **RAM map:** see [RAM_MAP.md](RAM_MAP.md).
+  - `web/mod/ram-map.js` reads players, enemies, enemy bullets and pickups from the game's object
+    pools.
+  - The worker reads RAM through `_psx_ram_ptr` and `_psx_scratch_ptr`.
+- **AI wingman** (`web/mod/bot.js`). It runs on the host only, in Modified games.
+  - **Perception.** Every frame it reads the enemy bullets and the air enemies. It measures their
+    velocities from the previous frame.
+  - **Plan search.** It predicts where everything will be over the next 22 frames and scores
+    243 two-step movement plans. A plan costs more for coming near danger and earns credit for
+    where it would like to be:
+    - under a target, in a different lane from player 1;
+    - near a pickup that player 1 is not already taking;
+    - low on the screen, away from the walls and from player 1.
+  - **Actions.** It takes the first step of the best plan, keeps rapid fire held, and bombs when
+    every plan gets hit.
+  - **Start.** It presses Start only when it is not in play (title, join, continue), because Start
+    pauses a game in progress.
+  - **Results.** In headless 30k-frame games it loses about 1 life per 10k frames. It clears
+    several stages on its own.
+- **Wingman netplay.** The host's worker sends the wingman's pad along with its own, as an 8-byte
+  input `[frame][p1][p2]`.
+  - The server accepts it only in Modified games, and only for frames that no human player 2 owns.
+  - The pad goes into the input log, so watchers replay the wingman without running it.
+  - When a watcher presses Start, the server turns the wingman off (`botoff`) and the person takes
+    over the same ship. The usual join Start pulse is skipped when player 2 is already in the game.
+  - When that person leaves, the wingman comes back if the host still has it switched on.
+- **Tuning.**
+  - `HOOK=tools/hooks/bot.mjs node --stack-size=984 tools/node-harness.mjs <disc> 30000 "300:start,600:start,900:start,1200:start"`
+    plays the wingman headless. It reports frames flown, deaths, bombs and score, and saves a
+    screenshot and a state dump at each death.
+    - `BOT_CFG='{"margin":18}'` overrides parameters.
+    - `BOT_RANDOM=1` gives a random-input baseline.
+  - In the browser, `?botdebug` draws what the wingman sees over the game.
