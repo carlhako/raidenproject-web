@@ -7,6 +7,8 @@ User=raidenproject
 WorkingDirectory=/opt/raidenproject-web
 EnvironmentFile=-/etc/raidenproject-web.env
 Environment=NODE_ENV=production
+Environment=LOG_DIR=/var/lib/raidenproject-web
+StateDirectory=raidenproject-web
 ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
 RestartSec=2

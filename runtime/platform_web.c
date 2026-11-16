@@ -56,7 +56,9 @@ void platform_frame(void) {
     latch_pads();
 }
 
-void platform_audio(const int16_t *samples, int frames) { js_audio(samples, frames); }
+/* The empty asm after the call keeps clang from emitting `return_call` into the JS import:
+ * Firefox crashed on that wasm->JS tail call (the stack ended in run_events with no frame above). */
+void platform_audio(const int16_t *samples, int frames) { js_audio(samples, frames); __asm__ volatile("" ::: "memory"); }
 uint16_t platform_pad_buttons(int port) { return port < 2 ? pad_cur[port] : 0xffff; }
 int platform_pad_present(int port) { return port < 2 && pad_pres[port]; }
 

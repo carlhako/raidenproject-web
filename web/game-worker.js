@@ -13,6 +13,12 @@ self.onmessage = async (e) => {
   const { ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab } = e.data;
   const ctrl = new Int32Array(ctrlSab), fb = new Uint8Array(fbSab), aud = new Int16Array(audSab), log = new Uint32Array(logSab);
   const fatal = (m) => { postMessage({ type: 'fatal', msg: m }); };
+  // Firefox's err.stack has no "Name: message" line, so put it in front ourselves.
+  const describe = (err) => {
+    if (!err || typeof err !== 'object') return String(err);
+    const head = (err.name || 'Error') + ': ' + (err.message || String(err)), st = err.stack || '';
+    return st.startsWith(head) ? st : head + '\n' + st;
+  };
 
   // ---- disc: OPFS file read synchronously, with 32-sector read-ahead
   let sync, sectors = 0;
@@ -119,15 +125,15 @@ self.onmessage = async (e) => {
     fatal,
   };
 
-  mod = await createPsx({
+  try { mod = await createPsx({
     print: (s) => postMessage({ type: 'log', msg: s }),
     printErr: (s) => postMessage({ type: 'log', msg: s }),
     preRun: [(m) => {
       m.FS.mkdir('/memcard'); m.FS.mkdir('/memcard/bu00');
       for (const [name, data] of Object.entries(e.data.memcard || {})) m.FS.writeFile('/memcard/bu00/' + name, data);
     }],
-  });
+  }); } catch (err) { return fatal('Cannot start the game: ' + describe(err)); }
   self.psx.mod = mod;
   postMessage({ type: 'started' });
-  try { mod.callMain([]); } catch (err) { fatal(String(err && err.stack || err)); }
+  try { mod.callMain([]); } catch (err) { fatal(describe(err)); }
 };

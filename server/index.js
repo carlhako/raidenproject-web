@@ -12,6 +12,7 @@ const PORT = +(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
 const ROOT = path.resolve(process.env.DIST_DIR || path.join(here, '..', 'dist'));
 const ACCESS_KEY = process.env.ACCESS_KEY || '';
+const LOG_DIR = path.resolve(process.env.LOG_DIR || path.join(here, '..', 'logs'));
 const MAX_SESSIONS = 60, MAX_FRAMES = 1 << 19, JOIN_MARGIN = 90;
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -34,10 +35,42 @@ function isolation(res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
 }
 
+// ---------------------------------------------------------------- client error log (JSONL, one report per line)
+const CLIENT_LOG = path.join(LOG_DIR, 'client-errors.jsonl'), LOG_ROTATE = 10 << 20, LOG_BODY_MAX = 16 << 10, LOG_PER_MIN = 30;
+const logHits = new Map();
+setInterval(() => logHits.clear(), 60000).unref();
+function clientIp(req) { return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || ''; }
+function buildId() { try { return fs.statSync(path.join(ROOT, 'raiden.wasm')).mtime.toISOString(); } catch { return null; } }
+function clientLog(req, res) {
+  const ip = clientIp(req), hits = (logHits.get(ip) || 0) + 1; logHits.set(ip, hits);
+  if (hits > LOG_PER_MIN) { res.writeHead(429); req.resume(); return res.end(); }
+  const chunks = []; let size = 0, tooBig = false;
+  req.on('data', (c) => {
+    if (tooBig) return;
+    size += c.length;
+    if (size > LOG_BODY_MAX) { tooBig = true; chunks.length = 0; res.writeHead(413, { Connection: 'close' }); res.end(); } else chunks.push(c);
+  });
+  req.on('error', () => {});
+  req.on('end', () => {
+    if (tooBig) return;
+    let r; try { r = JSON.parse(Buffer.concat(chunks).toString()); } catch { res.writeHead(400); return res.end(); }
+    if (!r || typeof r !== 'object' || Array.isArray(r)) { res.writeHead(400); return res.end(); }
+    const line = JSON.stringify({ at: new Date().toISOString(), ip, build: buildId(), ...r, ua: String(r.ua || req.headers['user-agent'] || '').slice(0, 300) }) + '\n';
+    console.log(`client error [${ip}] ${String(r.kind).slice(0, 40)}: ${String(r.msg).split('\n')[0].slice(0, 200)}`);
+    try {
+      fs.mkdirSync(LOG_DIR, { recursive: true });
+      try { if (fs.statSync(CLIENT_LOG).size > LOG_ROTATE) fs.renameSync(CLIENT_LOG, CLIENT_LOG + '.1'); } catch {}
+      fs.appendFileSync(CLIENT_LOG, line);
+    } catch (e) { console.error('client log write failed:', e.message); }
+    res.writeHead(204); res.end();
+  });
+}
+
 const server = http.createServer((req, res) => {
   isolation(res);
   if (req.url === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (!authorized(req)) { res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Raiden II"' }); return res.end('Authentication required'); }
+  if (req.method === 'POST' && req.url === '/api/clientlog') return clientLog(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   let rel;
   try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); return res.end(); }
@@ -234,4 +267,4 @@ setInterval(() => {
   for (const s of sessions.values()) if (now - s.last > 5 * 60 * 1000) endSession(s, 'The game timed out.');
 }, 5000).unref();
 
-server.listen(PORT, HOST, () => console.log(`raidenproject-web listening on http://${HOST}:${PORT}  (dist: ${ROOT})${ACCESS_KEY ? '  [access key required]' : ''}`));
+server.listen(PORT, HOST, () => console.log(`raidenproject-web listening on http://${HOST}:${PORT}  (dist: ${ROOT}, logs: ${LOG_DIR})${ACCESS_KEY ? '  [access key required]' : ''}`));

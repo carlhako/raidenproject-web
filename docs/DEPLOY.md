@@ -51,6 +51,19 @@ Traefik: a plain router and service to `http://<lxc-ip>:8080` works; WebSockets 
 Open the HTTPS URL and run `crossOriginIsolated` in the console (must be `true`). `GET /healthz`
 returns `ok`. The first visit downloads the disc into the browser's private storage.
 
+## Client error log
+
+Browser-side errors (game crashes, worker and audio failures, uncaught exceptions, desyncs) are
+sent to `POST /api/clientlog` and appended, one JSON object per line, to
+`/var/lib/raidenproject-web/client-errors.jsonl` (rotated to `.1` at 10 MB; `./logs/` when run
+locally). Each line has the error, user agent, role, frame and the build (`raiden.wasm` mtime).
+A one-line summary also goes to the journal:
+
+```
+tail -f /var/lib/raidenproject-web/client-errors.jsonl
+journalctl -u raidenproject-web | grep 'client error'
+```
+
 ## Updating
 
 Run `deploy/deploy.sh` again. Browsers re-download the disc only if the hash in `data/disc.json` changes.

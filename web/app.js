@@ -10,6 +10,33 @@ const ROLES = { host: 0, watch: 1, p2: 2 };
 
 function setStatus(msg, err = false) { el.status.textContent = msg; el.status.classList.toggle('err', err); }
 function show(...which) { for (const k of ['lobby', 'progress']) el[k].hidden = !which.includes(k); }
+// ---------------------------------------------------------------- error reporting (POST /api/clientlog)
+const reported = new Set(); let reportCount = 0;
+function errText(e) {
+  if (!e || typeof e !== 'object') return String(e);
+  const head = (e.name || 'Error') + ': ' + (e.message || String(e)), st = e.stack || '';
+  return st.startsWith(head) ? st : head + (st ? '\n' + st : '');
+}
+function reportError(kind, msg, extra = {}) {
+  try {
+    msg = String(msg).slice(0, 8000);
+    const key = kind + '|' + msg.slice(0, 300);
+    if (reported.has(key) || ++reportCount > 20) return;
+    reported.add(key);
+    const g = game;
+    const body = JSON.stringify({
+      kind, msg, ...extra, ua: navigator.userAgent, url: location.pathname, t: new Date().toISOString(),
+      role: g?.role ?? null, session: g?.id ?? null, frame: g ? Atomics.load(g.ctrl, CTRL.FRAME) : null,
+      audio: audioCtx ? audioCtx.state : null,
+    });
+    const blob = new Blob([body], { type: 'application/json' });
+    if (!(navigator.sendBeacon && navigator.sendBeacon('api/clientlog', blob)))
+      fetch('api/clientlog', { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+  } catch { /* never let reporting throw */ }
+}
+window.addEventListener('error', (e) => reportError('window.error', e.error ? errText(e.error) : e.message, { src: `${e.filename}:${e.lineno}:${e.colno}` }));
+window.addEventListener('unhandledrejection', (e) => reportError('unhandledrejection', errText(e.reason)));
+
 function toast(msg, ms = 6000) { el.toast.textContent = msg; el.toast.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.toast.hidden = true, ms); }
 const storeGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const storeSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } };
@@ -157,7 +184,8 @@ async function startGame(role, opts = {}) {
   const worker = new Worker('game-worker.js');
   game = { worker, ctrl, log, fb, role, id: opts.id, host: opts.host || el.name.value || 'You', p2: opts.p2 || null, joining: false, localHash: new Map() };
   worker.onmessage = (e) => onWorker(e.data);
-  worker.onerror = (e) => { toast('Worker error: ' + e.message); };
+  worker.onerror = (e) => { const m = `${e.message} (${e.filename}:${e.lineno}:${e.colno})`; toast('Worker error: ' + m); reportError('worker.error', m); };
+  worker.onmessageerror = () => reportError('worker.messageerror', 'message could not be deserialized');
   worker.postMessage({ type: 'start', ctrl: ctrlSab, fb: fbSab, audio: audSab, log: logSab, memcard: b64ToCard(opts.memcard) });
   el.menu.hidden = true; el.chat.hidden = false; el.leave.hidden = false; syncKeys(); el.screen.classList.remove('idle');
   lastSeq = -1; cancelAnimationFrame(raf); raf = requestAnimationFrame(render);
@@ -168,8 +196,9 @@ async function startGame(role, opts = {}) {
       audioCtx = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
       await audioCtx.audioWorklet.addModule('audio-worklet.js');
       const node = new AudioWorkletNode(audioCtx, 'psx-audio', { outputChannelCount: [2], processorOptions: { ctrl: ctrlSab, audio: audSab } });
+      node.onprocessorerror = (e) => reportError('audio.processorerror', errText(e.error || e.message || 'audio worklet failed'));
       node.connect(audioCtx.destination);
-    } catch (e) { console.warn('audio unavailable', e); audioCtx = null; }
+    } catch (e) { console.warn('audio unavailable', e); reportError('audio.init', errText(e)); audioCtx = null; }
   }
   if (g === game && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 }
@@ -194,8 +223,8 @@ function onWorker(m) {
       break;
     case 'hash': sendWs({ t: 'hash', frame: m.frame, h: m.h }); break;
     case 'memcard': if (game && game.role === 'host') storeSet('memcard', m.files); break;
-    case 'fatal': toast('Game crashed: ' + m.msg, 20000); console.error(m.msg); break;
-    case 'log': if (/FATAL|cannot/i.test(m.msg)) console.warn(m.msg); break;
+    case 'fatal': toast('Game crashed: ' + m.msg, 20000); console.error(m.msg); reportError('fatal', m.msg); break;
+    case 'log': if (/FATAL|cannot/i.test(m.msg)) { console.warn(m.msg); reportError('worker.log', m.msg); } break;
   }
 }
 
@@ -254,7 +283,7 @@ function onWs(data) {
     case 'p2left': if (game) { game.p2 = null; chatLine({ text: 'Player 2 left.' }, 'sys'); } break;
     case 'sys': chatLine({ text: m.text }, 'sys'); break;
     case 'chat': chatLine(m); break;
-    case 'desync': toast(`Desync detected at frame ${m.frame}: this game is no longer in sync with the host. Leave and watch again.`, 30000); break;
+    case 'desync': reportError('desync', `frame ${m.frame}`); toast(`Desync detected at frame ${m.frame}: this game is no longer in sync with the host. Leave and watch again.`, 30000); break;
     case 'ended': if (game) toMenu(m.reason || 'The game ended.'); break;
     case 'error': setStatus(m.msg, true); if (game) toMenu(m.msg); break;
   }
@@ -304,6 +333,6 @@ async function boot() {
     if (!(await ensureDisc())) return;
     show('lobby'); setStatus('');
     await connect().catch((e) => setStatus(e.message, true));
-  } catch (e) { setStatus('Setup failed: ' + e.message, true); show('lobby'); }
+  } catch (e) { setStatus('Setup failed: ' + e.message, true); reportError('setup', errText(e)); show('lobby'); }
 }
 boot();
