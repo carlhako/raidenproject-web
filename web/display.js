@@ -148,7 +148,7 @@ void main() {
 const SOURCES = { sharp: SHARP, smooth: SMOOTH, crt: CRT };
 
 export function createDisplay(canvas) {
-  let w = 0, h = 0, pix = null, hasFrame = false, filter = 'smooth';
+  let w = 0, h = 0, pix = null, hasFrame = false, filter = 'crt';
   let gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false });
   let progs = {}, tex = null, vao = null, ctx2d = null, off = null;
 

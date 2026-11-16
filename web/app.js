@@ -120,7 +120,7 @@ function updatePad() {
   const pads = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(Boolean);
   const nowMs = performance.now(); let lat = 0;
   for (const [bit, until] of latched) { if (until > nowMs) lat |= bit; else latched.delete(bit); }
-  const m0 = kb | lat | padFromGamepad(pads[0]);
+  const m0 = kb | lat | padFromGamepad(pads[0]) | (autoshoot ? SHOOT : 0);
   Atomics.store(game.ctrl, CTRL.PAD0, (~m0) & 0xffff);
   if (!keysEl.hidden) for (const k of keyCaps) k.el.classList.toggle('on', !!(m0 & k.bit));
   const st = !!(m0 & (1 << 3));
@@ -131,12 +131,19 @@ const keysEl = document.getElementById('keys');
 const keyCaps = [...keysEl.querySelectorAll('.k')].map((e) => ({ el: e, bit: +e.dataset.bit }));
 let keysWanted = true; try { keysWanted = localStorage.getItem('keys') !== '0'; } catch {}
 const syncKeys = () => { keysEl.hidden = !(game && keysWanted); };
-const typing = (e) => e.target instanceof HTMLInputElement;
+// Game settings: autoshoot holds the shoot button (Square) for you
+const SHOOT = 1 << 15, autoEl = $('opt-autoshoot');
+let autoshoot = storeGet('autoshoot') === true;
+autoEl.checked = autoshoot;
+function setAutoshoot(on) { autoshoot = on; autoEl.checked = on; storeSet('autoshoot', on); updatePad(); }
+autoEl.addEventListener('change', () => { setAutoshoot(autoEl.checked); autoEl.blur(); });
+const typing = (e) => e.target instanceof HTMLInputElement && e.target.type !== 'checkbox';
 addEventListener('keydown', (e) => {
   if (typing(e) || !game) return;
   if (e.code === 'KeyT') { e.preventDefault(); if (!e.repeat) el.chatInput.focus(); return; }
   if (e.code === 'KeyK' && !e.repeat) { keysWanted = !keysWanted; try { localStorage.setItem('keys', keysWanted ? '1' : '0'); } catch {} syncKeys(); return; }
   if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); cycleFilter(); return; }
+  if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); setAutoshoot(!autoshoot); banner(`Autoshoot ${autoshoot ? 'on' : 'off'}`, autoshoot ? 'go' : '', 1500); return; }
   if (e.code in KEYS) { e.preventDefault(); kb |= KEYS[e.code]; latched.set(KEYS[e.code], performance.now() + 40); updatePad(); }
 });
 addEventListener('keyup', (e) => { if (game && e.code in KEYS) { kb &= ~KEYS[e.code]; updatePad(); } });

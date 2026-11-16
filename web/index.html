@@ -10,11 +10,29 @@
 <main id="stage">
   <canvas id="screen" width="368" height="240"></canvas>
 
-  <nav id="topbar" aria-label="Display">
-    <div id="filters" role="group" aria-label="Video filter"></div>
-    <button id="btn-full" class="ghost small">Fullscreen</button>
-    <button id="btn-leave" class="ghost small" hidden>Leave</button>
-  </nav>
+  <aside id="side" aria-label="Settings and controls">
+    <section class="side-sec" aria-label="Display">
+      <span class="sl">Display</span>
+      <div id="filters" role="group" aria-label="Video filter"></div>
+      <div class="side-row">
+        <button id="btn-full" class="ghost small">Fullscreen</button>
+        <button id="btn-leave" class="ghost small" hidden>Leave</button>
+      </div>
+    </section>
+    <section class="side-sec" aria-label="Game settings">
+      <span class="sl">Game settings</span>
+      <label class="switch"><input type="checkbox" id="opt-autoshoot"><span class="track"></span><span class="stxt">Autoshoot</span><kbd>F</kbd></label>
+    </section>
+    <section id="keys" class="side-sec" hidden aria-label="Controls">
+      <span class="sl">Controls</span>
+      <div class="kgrp"><span class="kl">Move</span><div class="dpad">
+        <i class="k" data-bit="16" style="grid-area:u">↑</i><i class="k" data-bit="128" style="grid-area:l">←</i><i class="k" data-bit="64" style="grid-area:d">↓</i><i class="k" data-bit="32" style="grid-area:r">→</i></div></div>
+      <div class="kgrp"><span class="kl">Shoot / Bomb</span><div class="krow"><i class="k" data-bit="32768">Z<small>□ shoot</small></i><i class="k" data-bit="16384">X<small>✕ bomb</small></i><i class="k" data-bit="8192">A<small>○</small></i><i class="k" data-bit="4096">S<small>△</small></i></div></div>
+      <div class="kgrp"><span class="kl">Shoulders</span><div class="krow"><i class="k" data-bit="1024">Q<small>L1</small></i><i class="k" data-bit="2048">W<small>R1</small></i><i class="k" data-bit="256">E<small>L2</small></i><i class="k" data-bit="512">R<small>R2</small></i></div></div>
+      <div class="kgrp"><span class="kl">Start / Select</span><div class="krow"><i class="k wide" data-bit="8">Enter<small>Start</small></i><i class="k wide" data-bit="1">Bksp<small>Select</small></i></div></div>
+      <div class="kfoot">T chat · V filter · F autoshoot · K hide</div>
+    </section>
+  </aside>
 
   <section id="menu" class="panel">
     <h1>Raiden II</h1>
@@ -37,19 +55,11 @@
         <tr><td>D-pad</td><td>Arrow keys</td></tr><tr><td>Start (also joins a game you are watching)</td><td>Enter</td></tr><tr><td>Select</td><td>Backspace</td></tr>
         <tr><td>✕ ○ □ △</td><td>Z X A S</td></tr><tr><td>L1 R1 L2 R2</td><td>Q W E R</td></tr>
         <tr><td>Gamepad</td><td>Standard mapping</td></tr><tr><td>Chat</td><td>T</td></tr>
-        <tr><td>Cycle video filter</td><td>V</td></tr>
+        <tr><td>Cycle video filter</td><td>V</td></tr><tr><td>Toggle autoshoot</td><td>F</td></tr>
       </table>
     </details>
   </section>
 
-  <aside id="keys" hidden aria-label="Controls">
-    <div class="kgrp"><span class="kl">Move</span><div class="dpad">
-      <i class="k" data-bit="16" style="grid-area:u">↑</i><i class="k" data-bit="128" style="grid-area:l">←</i><i class="k" data-bit="64" style="grid-area:d">↓</i><i class="k" data-bit="32" style="grid-area:r">→</i></div></div>
-    <div class="kgrp"><span class="kl">Shoot / Bomb</span><div class="krow"><i class="k" data-bit="32768">Z<small>□ shoot</small></i><i class="k" data-bit="16384">X<small>✕ bomb</small></i><i class="k" data-bit="8192">A<small>○</small></i><i class="k" data-bit="4096">S<small>△</small></i></div></div>
-    <div class="kgrp"><span class="kl">Shoulders</span><div class="krow"><i class="k" data-bit="1024">Q<small>L1</small></i><i class="k" data-bit="2048">W<small>R1</small></i><i class="k" data-bit="256">E<small>L2</small></i><i class="k" data-bit="512">R<small>R2</small></i></div></div>
-    <div class="kgrp"><span class="kl">Start / Select</span><div class="krow"><i class="k wide" data-bit="8">Enter<small>Start</small></i><i class="k wide" data-bit="1">Bksp<small>Select</small></i></div></div>
-    <div class="kfoot">T chat · V filter · K hide</div>
-  </aside>
   <div id="banner" hidden></div>
   <div id="toast" hidden></div>
 
