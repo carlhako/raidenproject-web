@@ -131,8 +131,8 @@ const keysEl = document.getElementById('keys');
 const keyCaps = [...keysEl.querySelectorAll('.k')].map((e) => ({ el: e, bit: +e.dataset.bit }));
 let keysWanted = true; try { keysWanted = localStorage.getItem('keys') !== '0'; } catch {}
 const syncKeys = () => { keysEl.hidden = !(game && keysWanted); };
-// Game settings: autoshoot holds the shoot button (Square) for you
-const SHOOT = 1 << 15, autoEl = $('opt-autoshoot');
+// Game settings: autoshoot holds rapid shoot (S = Triangle) for you
+const SHOOT = 1 << 12, autoEl = $('opt-autoshoot');
 let autoshoot = storeGet('autoshoot') === true;
 autoEl.checked = autoshoot;
 function setAutoshoot(on) { autoshoot = on; autoEl.checked = on; storeSet('autoshoot', on); updatePad(); }
