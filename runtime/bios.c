@@ -244,6 +244,14 @@ void bios_init(void) {
     for (int i = 0; i < 0xc0; i++) wr32(0x80000200 + 4 * i, 0x80001000);
     for (int i = 0; i < 0x60; i++) wr32(0x80000874 + 4 * i, 0x80001000);
     for (int i = 0; i < 0x20; i++) wr32(0x80000674 + 4 * i, 0x80001000);
+    /* Booting Raiden II directly skips the disc's launcher, which leaves the game settings block
+     * at 0x80010000 (just below PSJJ3's load address) for it to read. Left zeroed, no button is
+     * assigned to shot or bomb. These are the launcher's defaults, as dumped at its Exec(). */
+    extern int bios_r2only(void);
+    if (bios_r2only()) {
+        static const uint8_t defaults[24] = { 0,0,0,3, 0,0,0,1, 2,2,0,0, 0,0,1,0, 0x8c,0,0x10,0, 0x60,0,0,0 };
+        for (int i = 0; i < 24; i++) wr8(0x80010000 + i, defaults[i]);
+    }
 }
 
 /* ---- CD-ROM file access through the BIOS (cd, Load, firstfile on "cdrom:") ---- */
@@ -253,6 +261,7 @@ static char cd_cwd[128] = "\\";
 /* Web build is Raiden II only: start in \JJ3X and turn every Load of another executable into PSJJ3.EXE */
 static int r2only;
 void bios_boot_raiden2(void) { r2only = 1; snprintf(cd_cwd, sizeof cd_cwd, "\\JJ3X"); }
+int bios_r2only(void) { return r2only; }
 
 /* Load(path, struct EXEC*): read a PS-X EXE into RAM and fill the EXEC block */
 static uint32_t bios_load_exe(uint32_t path_a, uint32_t ex) {

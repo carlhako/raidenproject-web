@@ -100,7 +100,8 @@ el.own.addEventListener('change', async () => {
 
 // ---------------------------------------------------------------- input
 const KEYS = { ArrowUp: 1 << 4, ArrowRight: 1 << 5, ArrowDown: 1 << 6, ArrowLeft: 1 << 7, Enter: 1 << 3, Backspace: 1, ShiftRight: 1,
-  KeyZ: 1 << 14, KeyX: 1 << 13, KeyA: 1 << 15, KeyS: 1 << 12, KeyQ: 1 << 10, KeyW: 1 << 11, KeyE: 1 << 8, KeyR: 1 << 9 };
+  KeyZ: 1 << 15, KeyX: 1 << 14, KeyA: 1 << 13, KeyS: 1 << 12,   // Z = Square (shoot), X = Cross (bomb) in the game's default controls
+  KeyQ: 1 << 10, KeyW: 1 << 11, KeyE: 1 << 8, KeyR: 1 << 9 };
 let kb = 0, game = null, prevStart = false;
 const latched = new Map();      // bit -> expiry: a tap shorter than ~2 frames still registers       // game = { worker, ctrl, log, fb, role, id, ... } while in a game
 
