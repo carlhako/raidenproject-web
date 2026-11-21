@@ -186,7 +186,9 @@ executables, so don't redistribute it.
   small browser stack never grows. Native and wasm runs are deterministic (identical state hashes over 20,000 random-input frames).
 - **Threading:** the game never yields, so it runs in a Web Worker (`web/game-worker.js`); video, audio and controls move
   through SharedArrayBuffers, so the page needs cross-origin isolation (headers set by `server/index.js`). Pacing is NTSC 60 Hz.
-- **Disc:** the 56 MB image is stored in OPFS and read synchronously by the worker.
+- **Disc:** the 56 MB image is stored in OPFS and read synchronously by the worker. The CD emulation delivers data sectors
+  8× faster than a real double-speed drive (`FAST_CD_SPS` in `runtime/cdrom.c`; XA audio streaming keeps the real rate), so the
+  boot loading screen lasts ~2 s instead of ~9 s and stage loads are shorter too.
 - **Sessions:** the server keeps an authoritative per-frame input log `(p1 | p2 << 16)` for each game. While the host plays
   alone, it streams its pad per frame and the server appends and fans out. A **watcher** receives the log from frame 0 and
   replays it (the recompiled game cannot snapshot its state, but it is deterministic), running unthrottled and muted while

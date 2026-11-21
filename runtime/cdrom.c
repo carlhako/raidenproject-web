@@ -76,7 +76,14 @@ void cd_event(void) {
     deliver(&p);
 }
 
-static int sector_period(void) { return (mode & 0x80) ? CPU_HZ / 150 : CPU_HZ / 75; }
+/* Data sectors arrive 8x faster than a real double-speed drive, so loading screens are short
+ * (the game acks each sector before the next is delivered, see cd_read_event). XA-ADPCM
+ * streaming keeps the real rate so audio plays at the right speed. */
+#define FAST_CD_SPS 1200
+static int sector_period(void) {
+    if (!(mode & 0x40)) return CPU_HZ / FAST_CD_SPS;
+    return (mode & 0x80) ? CPU_HZ / 150 : CPU_HZ / 75;
+}
 
 static void start_reading(void) {
     if (setloc_pending) { cur_lba = setloc_lba; setloc_pending = 0; }
